@@ -16,8 +16,15 @@ const mockPlayers: Player[] = [
 
 export default function PositionLineupExample() {
   const [positions, setPositions] = useState<Record<string, Player | null>>({
-    P: null, C: null, "1B": null, "2B": null, "3B": null,
-    SS: null, LF: null, CF: null, RF: null
+    P: mockPlayers[1],
+    C: mockPlayers[2],
+    "1B": mockPlayers[3],
+    "2B": mockPlayers[5],
+    "3B": mockPlayers[7],
+    SS: mockPlayers[0],
+    LF: mockPlayers[6],
+    CF: mockPlayers[4],
+    RF: mockPlayers[8]
   });
 
   const handleGenerate = () => {

@@ -9,18 +9,6 @@ interface PositionLineupProps {
   onGenerate: () => void;
 }
 
-const POSITION_LABELS: Record<string, string> = {
-  P: "Pitcher",
-  C: "Catcher",
-  "1B": "First Base",
-  "2B": "Second Base",
-  "3B": "Third Base",
-  SS: "Shortstop",
-  LF: "Left Field",
-  CF: "Center Field",
-  RF: "Right Field",
-};
-
 export default function PositionLineup({ players, positions, onGenerate }: PositionLineupProps) {
   const hasEnoughPlayers = players.length >= 9;
   const hasPositions = Object.values(positions).some(p => p !== null);
@@ -54,43 +42,67 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
       )}
 
       {hasPositions && (
-        <div className="relative w-full aspect-square max-w-2xl mx-auto">
-          <div className="absolute inset-0 bg-primary/5 rounded-md" />
-          
-          <div className="absolute top-[5%] left-1/2 -translate-x-1/2">
-            <PositionCard position="P" player={positions.P} />
-          </div>
-          
-          <div className="absolute top-[45%] left-1/2 -translate-x-1/2">
-            <PositionCard position="C" player={positions.C} />
-          </div>
-          
-          <div className="absolute bottom-[15%] left-[15%]">
-            <PositionCard position="1B" player={positions["1B"]} />
-          </div>
-          
-          <div className="absolute bottom-[35%] left-[35%]">
-            <PositionCard position="2B" player={positions["2B"]} />
-          </div>
-          
-          <div className="absolute bottom-[15%] right-[15%]">
-            <PositionCard position="3B" player={positions["3B"]} />
-          </div>
-          
-          <div className="absolute bottom-[35%] right-[35%]">
-            <PositionCard position="SS" player={positions.SS} />
-          </div>
-          
-          <div className="absolute top-[15%] left-[5%]">
-            <PositionCard position="LF" player={positions.LF} />
-          </div>
-          
-          <div className="absolute top-[5%] left-1/2 -translate-x-1/2 translate-y-[-120%]">
-            <PositionCard position="CF" player={positions.CF} />
-          </div>
-          
-          <div className="absolute top-[15%] right-[5%]">
-            <PositionCard position="RF" player={positions.RF} />
+        <div className="relative w-full max-w-3xl mx-auto" style={{ paddingBottom: '100%' }}>
+          <div className="absolute inset-0">
+            <svg
+              className="absolute inset-0 w-full h-full"
+              viewBox="0 0 500 500"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect x="0" y="0" width="500" height="500" fill="hsl(var(--primary) / 0.08)" rx="8" />
+              
+              <path
+                d="M 250 380 L 120 250 L 250 120 L 380 250 Z"
+                fill="hsl(var(--primary) / 0.12)"
+                stroke="hsl(var(--primary) / 0.3)"
+                strokeWidth="2"
+              />
+              
+              <circle cx="250" cy="250" r="8" fill="hsl(var(--primary) / 0.4)" />
+              
+              <path
+                d="M 245 385 L 250 380 L 255 385"
+                fill="none"
+                stroke="hsl(var(--primary) / 0.3)"
+                strokeWidth="2"
+              />
+            </svg>
+
+            <div className="absolute top-[76%] left-1/2 -translate-x-1/2">
+              <PositionMarker position="C" player={positions.C} />
+            </div>
+
+            <div className="absolute top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2">
+              <PositionMarker position="P" player={positions.P} />
+            </div>
+
+            <div className="absolute top-[50%] left-[24%] -translate-y-1/2">
+              <PositionMarker position="1B" player={positions["1B"]} />
+            </div>
+
+            <div className="absolute top-[24%] left-1/2 -translate-x-1/2">
+              <PositionMarker position="2B" player={positions["2B"]} />
+            </div>
+
+            <div className="absolute top-[50%] right-[24%] -translate-y-1/2">
+              <PositionMarker position="3B" player={positions["3B"]} />
+            </div>
+
+            <div className="absolute top-[34%] right-[34%]">
+              <PositionMarker position="SS" player={positions.SS} />
+            </div>
+
+            <div className="absolute top-[8%] left-[12%]">
+              <PositionMarker position="LF" player={positions.LF} />
+            </div>
+
+            <div className="absolute top-[4%] left-1/2 -translate-x-1/2">
+              <PositionMarker position="CF" player={positions.CF} />
+            </div>
+
+            <div className="absolute top-[8%] right-[12%]">
+              <PositionMarker position="RF" player={positions.RF} />
+            </div>
           </div>
         </div>
       )}
@@ -107,28 +119,32 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
   );
 }
 
-function PositionCard({ position, player }: { position: string; player: Player | null }) {
+function PositionMarker({ position, player }: { position: string; player: Player | null }) {
+  if (!player) {
+    return (
+      <div className="flex flex-col items-center" data-testid={`card-position-${position}`}>
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-1">
+          <span className="text-xs font-semibold text-muted-foreground">{position}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card className="p-3 min-w-[120px] hover-elevate" data-testid={`card-position-${position}`}>
-      <div className="text-center">
-        <div className="text-xs font-semibold text-muted-foreground mb-1">
+    <div className="flex flex-col items-center" data-testid={`card-position-${position}`}>
+      <div className="w-14 h-14 rounded-full bg-primary border-2 border-primary-border flex items-center justify-center mb-1 shadow-md">
+        <span className="text-2xl font-bold text-primary-foreground">
+          {player.number}
+        </span>
+      </div>
+      <div className="text-center bg-card px-2 py-1 rounded-md shadow-sm border border-card-border">
+        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
           {position}
         </div>
-        {player ? (
-          <>
-            <div className="w-10 h-10 mx-auto rounded-full bg-primary flex items-center justify-center mb-1">
-              <span className="text-lg font-bold text-primary-foreground">
-                {player.number}
-              </span>
-            </div>
-            <div className="text-sm font-medium truncate" data-testid={`text-position-name-${position}`}>
-              {player.name}
-            </div>
-          </>
-        ) : (
-          <div className="w-10 h-10 mx-auto rounded-full border-2 border-dashed border-muted mb-1" />
-        )}
+        <div className="text-xs font-semibold whitespace-nowrap" data-testid={`text-position-name-${position}`}>
+          {player.name}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }
