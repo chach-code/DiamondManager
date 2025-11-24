@@ -51,9 +51,14 @@ export default function BattingLineup({ players, lineup, onGenerate }: BattingLi
                   </span>
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold" data-testid={`text-batting-name-${index + 1}`}>
-                    {player.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold" data-testid={`text-batting-name-${index + 1}`}>
+                      {player.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {player.positions.join(', ')}
+                    </p>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     #{player.number}
                   </p>
