@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shuffle } from "lucide-react";
 import type { Player } from "./PlayerCard";
+import baseballFieldImage from "@assets/image_1764009560393.png";
 
 interface PositionLineupProps {
   players: Player[];
@@ -44,29 +45,11 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
       {hasPositions && (
         <div className="relative w-full max-w-3xl mx-auto" style={{ paddingBottom: '100%' }}>
           <div className="absolute inset-0">
-            <svg
-              className="absolute inset-0 w-full h-full"
-              viewBox="0 0 500 500"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <rect x="0" y="0" width="500" height="500" fill="hsl(var(--primary) / 0.08)" rx="8" />
-              
-              <path
-                d="M 250 380 L 120 250 L 250 120 L 380 250 Z"
-                fill="hsl(var(--primary) / 0.12)"
-                stroke="hsl(var(--primary) / 0.3)"
-                strokeWidth="2"
-              />
-              
-              <circle cx="250" cy="250" r="8" fill="hsl(var(--primary) / 0.4)" />
-              
-              <path
-                d="M 245 385 L 250 380 L 255 385"
-                fill="none"
-                stroke="hsl(var(--primary) / 0.3)"
-                strokeWidth="2"
-              />
-            </svg>
+            <img 
+              src={baseballFieldImage} 
+              alt="Baseball field" 
+              className="absolute inset-0 w-full h-full object-contain rounded-lg"
+            />
 
             <div className="absolute top-[82%] left-1/2 -translate-x-1/2">
               <PositionMarker position="C" player={positions.C} />
