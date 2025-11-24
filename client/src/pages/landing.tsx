@@ -1,9 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useLocation } from "wouter";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 import { Users, Target, Zap } from "lucide-react";
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
+
+  const handleGuestMode = () => {
+    localStorage.setItem("guestMode", "true");
+    setLocation("/");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -21,13 +29,23 @@ export default function Landing() {
           <p className="text-xl mb-8 max-w-2xl text-white/90">
             Create teams, manage rosters, and generate winning lineups instantly
           </p>
-          <Button
-            size="lg"
-            onClick={() => window.location.href = "/api/login"}
-            data-testid="button-signin"
-          >
-            Sign In with Google
-          </Button>
+          <div className="flex gap-4 flex-wrap justify-center">
+            <Button
+              size="lg"
+              onClick={() => window.location.href = "/api/login"}
+              data-testid="button-signin"
+            >
+              Sign In with Google
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleGuestMode}
+              data-testid="button-guest-mode"
+            >
+              Continue as Guest
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -65,15 +83,25 @@ export default function Landing() {
         <div className="max-w-2xl mx-auto text-center px-4">
           <h2 className="font-bebas text-4xl tracking-wide mb-4">Ready to Get Started?</h2>
           <p className="text-muted-foreground mb-8">
-            Sign in with your Google account to start managing your teams today
+            Sign in with your Google account to save your teams, or try as a guest (data won't be saved)
           </p>
-          <Button
-            size="lg"
-            onClick={() => window.location.href = "/api/login"}
-            data-testid="button-signin-cta"
-          >
-            Sign In Now
-          </Button>
+          <div className="flex gap-4 flex-wrap justify-center">
+            <Button
+              size="lg"
+              onClick={() => window.location.href = "/api/login"}
+              data-testid="button-signin-cta"
+            >
+              Sign In Now
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleGuestMode}
+              data-testid="button-guest-mode-cta"
+            >
+              Try as Guest
+            </Button>
+          </div>
         </div>
       </div>
     </div>

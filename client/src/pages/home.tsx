@@ -1,12 +1,14 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Users, Trash2, FlaskConical } from "lucide-react";
+import { Plus, Users, Trash2, FlaskConical, LogOut, AlertCircle } from "lucide-react";
 import PlayerCard, { type Player } from "@/components/PlayerCard";
 import PlayerFormDialog from "@/components/PlayerFormDialog";
 import BattingLineup from "@/components/BattingLineup";
 import PositionLineup from "@/components/PositionLineup";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 
 const DEMO_PLAYERS: Player[] = [
@@ -22,6 +24,8 @@ const DEMO_PLAYERS: Player[] = [
 ];
 
 export default function Home() {
+  const [, setLocation] = useLocation();
+  const { isGuestMode } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -30,6 +34,15 @@ export default function Home() {
     P: null, C: null, "1B": null, "2B": null, "3B": null,
     SS: null, LF: null, CF: null, RF: null
   });
+
+  const handleLogout = () => {
+    if (isGuestMode) {
+      localStorage.removeItem("guestMode");
+      setLocation("/");
+    } else {
+      window.location.href = "/api/logout";
+    }
+  };
 
   const handleSavePlayer = (playerData: Omit<Player, 'id'> & { id?: string }) => {
     if (playerData.id) {
@@ -85,6 +98,21 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      {isGuestMode && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            You're in guest mode. Your lineups won't be saved. 
+            <button 
+              onClick={() => window.location.href = "/api/login"}
+              data-testid="button-sign-in-banner"
+              className="ml-2 underline hover:opacity-80 font-medium"
+            >
+              Sign in to save your progress.
+            </button>
+          </p>
+        </div>
+      )}
       <div className="relative h-[400px] overflow-hidden">
         <img
           src={heroImage}
@@ -100,8 +128,17 @@ export default function Home() {
             Build your roster and generate batting orders and field positions with ease
           </p>
         </div>
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex gap-2">
           <ThemeToggle />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            {isGuestMode ? "Exit Guest" : "Logout"}
+          </Button>
         </div>
       </div>
 
