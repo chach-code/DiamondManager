@@ -203,6 +203,7 @@ export default function Home() {
               players={players}
               lineup={battingLineup}
               onGenerate={handleGenerateBattingLineup}
+              positions={positions}
             />
           </TabsContent>
 

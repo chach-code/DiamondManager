@@ -7,10 +7,20 @@ interface BattingLineupProps {
   players: Player[];
   lineup: Player[];
   onGenerate: () => void;
+  positions?: Record<string, Player | null>;
 }
 
-export default function BattingLineup({ players, lineup, onGenerate }: BattingLineupProps) {
+export default function BattingLineup({ players, lineup, onGenerate, positions = {} }: BattingLineupProps) {
   const hasEnoughPlayers = players.length >= 9;
+
+  const getPlayerPosition = (playerId: string) => {
+    for (const [pos, player] of Object.entries(positions)) {
+      if (player?.id === playerId) {
+        return pos;
+      }
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -51,13 +61,15 @@ export default function BattingLineup({ players, lineup, onGenerate }: BattingLi
                   </span>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <p className="font-semibold" data-testid={`text-batting-name-${index + 1}`}>
                       {player.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {player.positions.join(', ')}
-                    </p>
+                    {getPlayerPosition(player.id) && (
+                      <p className="text-sm font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {getPlayerPosition(player.id)}
+                      </p>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     #{player.number}
