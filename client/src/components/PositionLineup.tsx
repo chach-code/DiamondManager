@@ -68,7 +68,7 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
               />
             </svg>
 
-            <div className="absolute top-[76%] left-1/2 -translate-x-1/2">
+            <div className="absolute top-[82%] left-1/2 -translate-x-1/2">
               <PositionMarker position="C" player={positions.C} />
             </div>
 
@@ -76,7 +76,7 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
               <PositionMarker position="P" player={positions.P} />
             </div>
 
-            <div className="absolute top-[50%] left-[24%] -translate-y-1/2">
+            <div className="absolute top-[50%] right-[24%] -translate-y-1/2">
               <PositionMarker position="1B" player={positions["1B"]} />
             </div>
 
@@ -84,11 +84,11 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
               <PositionMarker position="2B" player={positions["2B"]} />
             </div>
 
-            <div className="absolute top-[50%] right-[24%] -translate-y-1/2">
+            <div className="absolute top-[50%] left-[24%] -translate-y-1/2">
               <PositionMarker position="3B" player={positions["3B"]} />
             </div>
 
-            <div className="absolute top-[34%] right-[34%]">
+            <div className="absolute top-[34%] left-[34%]">
               <PositionMarker position="SS" player={positions.SS} />
             </div>
 
