@@ -55,35 +55,35 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
               <PositionMarker position="C" player={positions.C} />
             </div>
 
-            <div className="absolute top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2">
               <PositionMarker position="P" player={positions.P} />
             </div>
 
-            <div className="absolute top-[50%] right-[24%] -translate-y-1/2">
+            <div className="absolute top-[40%] right-[24%] -translate-y-1/2">
               <PositionMarker position="1B" player={positions["1B"]} />
             </div>
 
-            <div className="absolute top-[34%] right-[34%]">
+            <div className="absolute top-[24%] right-[34%]">
               <PositionMarker position="2B" player={positions["2B"]} />
             </div>
 
-            <div className="absolute top-[50%] left-[24%] -translate-y-1/2">
+            <div className="absolute top-[40%] left-[24%] -translate-y-1/2">
               <PositionMarker position="3B" player={positions["3B"]} />
             </div>
 
-            <div className="absolute top-[34%] left-[34%]">
+            <div className="absolute top-[24%] left-[34%]">
               <PositionMarker position="SS" player={positions.SS} />
             </div>
 
-            <div className="absolute top-[8%] left-[12%]">
+            <div className="absolute top-[6%] left-[12%]">
               <PositionMarker position="LF" player={positions.LF} />
             </div>
 
-            <div className="absolute top-[4%] left-1/2 -translate-x-1/2">
+            <div className="absolute top-[2%] left-1/2 -translate-x-1/2">
               <PositionMarker position="CF" player={positions.CF} />
             </div>
 
-            <div className="absolute top-[8%] right-[12%]">
+            <div className="absolute top-[6%] right-[12%]">
               <PositionMarker position="RF" player={positions.RF} />
             </div>
           </div>
