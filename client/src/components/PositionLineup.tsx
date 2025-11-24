@@ -80,7 +80,7 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
               <PositionMarker position="1B" player={positions["1B"]} />
             </div>
 
-            <div className="absolute top-[24%] left-1/2 -translate-x-1/2">
+            <div className="absolute top-[34%] right-[34%]">
               <PositionMarker position="2B" player={positions["2B"]} />
             </div>
 
