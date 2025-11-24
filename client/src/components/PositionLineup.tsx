@@ -51,7 +51,7 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
               className="absolute inset-0 w-full h-full object-contain rounded-lg"
             />
 
-            <div className="absolute top-[78%] left-1/2 -translate-x-1/2">
+            <div className="absolute top-[76%] left-1/2 -translate-x-1/2">
               <PositionMarker position="C" player={positions.C} />
             </div>
 
