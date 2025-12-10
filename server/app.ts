@@ -100,7 +100,10 @@ export default async function runApp(
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    // Log the error for diagnostics but do not re-throw — throwing here
+    // would crash the process and make transient errors bring down the
+    // entire service (seen as 502/Bad Gateway on the client).
+    console.error("Unhandled error:", err);
   });
 
   // importantly run the final setup after setting up all the other routes so

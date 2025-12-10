@@ -11,8 +11,28 @@ import { storage } from "./storage";
 
 const getOidcConfig = memoize(
   async () => {
-    const config = await client.discovery(new URL("https://accounts.google.com"), process.env.GOOGLE_CLIENT_ID!);
-    return config;
+    const issuer = await client.Issuer.discover("https://accounts.google.com");
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      throw new Error("Missing required env vars: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET");
+    }
+
+    // Prefer an explicit callback URL, then a backend origin, then fallback to
+    // APP_ORIGIN for local dev. In production you should set either
+    // `GOOGLE_CALLBACK_URL` or `BACKEND_ORIGIN` to the URL where the backend
+    // is reachable (e.g. https://diamondmanager-backend.onrender.com).
+    const redirect = process.env.GOOGLE_CALLBACK_URL ?? `${process.env.BACKEND_ORIGIN ?? process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5000}`}/api/callback`;
+
+    const oidcClient = new issuer.Client({
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uris: [redirect],
+      response_types: ["code"],
+    });
+
+    return oidcClient;
   },
   { maxAge: 3600 * 1000 }
 );
@@ -80,7 +100,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
+  const oidcClient = await getOidcConfig();
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
@@ -91,19 +111,24 @@ export async function setupAuth(app: Express) {
     user.access_token = tokens.access_token;
     user.refresh_token = tokens.refresh_token;
     user.expires_at = user.claims?.exp;
-    await upsertUser(user.claims);
-    verified(null, user);
+    try {
+      await upsertUser(user.claims);
+      verified(null, user);
+    } catch (err) {
+      // If upsertUser or any downstream operation fails, call the passport
+      // callback with the error so passport can redirect to failureRedirect
+      // instead of allowing an unhandled exception to crash the process.
+      console.error("Error during user upsert in verify:", err);
+      verified(err as Error);
+    }
   };
 
   const strategyName = "google";
-  const redirect = process.env.GOOGLE_CALLBACK_URL ?? `${process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5000}`}/api/callback`;
 
   const strategy = new Strategy(
     {
-      name: strategyName,
-      config,
-      scope: "openid email profile",
-      callbackURL: redirect,
+      client: oidcClient,
+      params: { scope: "openid email profile" },
     },
     verify,
   );
@@ -157,8 +182,8 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+    const oidcClient = await getOidcConfig();
+    const tokenResponse = await oidcClient.refresh(refreshToken as string);
     // Update session user with refreshed tokens and claims
     user.claims = tokenResponse.claims();
     user.access_token = tokenResponse.access_token;
