@@ -1,7 +1,8 @@
 // Import openid-client dynamically inside the OIDC helper to avoid runtime
 // ESM/CJS export shape differences after bundling. We'll resolve `Issuer`
 // from either the named export or the default export.
-import { Strategy, type VerifyFunction } from "openid-client/passport";
+// `openid-client/passport` is imported dynamically inside `setupAuth`
+// to avoid loading provider-specific modules during unit tests.
 
 import passport from "passport";
 import session from "express-session";
@@ -9,7 +10,6 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import memorystore from "memorystore";
-import { storage } from "./storage";
 
 export const getOidcConfig = memoize(
   async () => {
@@ -43,6 +43,20 @@ export const getOidcConfig = memoize(
   },
   { maxAge: 3600 * 1000 }
 );
+
+// A small pure helper that computes the callback URL and validates required
+// environment variables. Exported for unit testing so we can validate
+// configuration without invoking network or provider discovery.
+export function getCallbackUrlFromEnv() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing required env vars: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET");
+  }
+
+  const redirect = process.env.GOOGLE_CALLBACK_URL ?? `${process.env.BACKEND_ORIGIN ?? process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5000}`}/api/callback`;
+  return redirect;
+}
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -92,6 +106,9 @@ export function getSession() {
 }
 
 async function upsertUser(claims: any) {
+  // Load storage lazily to avoid requiring the database during unit tests
+  const mod = await import('./storage');
+  const storage = mod.storage;
   await storage.upsertUser({
     id: claims.sub,
     email: claims.email,
@@ -109,7 +126,7 @@ export async function setupAuth(app: Express) {
 
   const oidcClient = await getOidcConfig();
 
-  const verify: VerifyFunction = async (
+  const verify: any = async (
     // Use a loose `any` here to avoid runtime/compile mismatches from the
     // underlying openid-client types when compiled and bundled for deploy.
     tokens: any,
@@ -134,13 +151,13 @@ export async function setupAuth(app: Express) {
 
   const strategyName = "google";
 
-  const strategy = new Strategy(
-    {
-      client: oidcClient,
-      params: { scope: "openid email profile" },
-    },
-    verify,
-  );
+  // Load the passport strategy dynamically so tests that import this
+  // module don't attempt to load `openid-client/passport` (which can be
+  // ESM-only and cause Jest to fail parsing node_modules). This import is
+  // executed only when the server actually sets up auth.
+  const passportMod: any = await import('openid-client/passport');
+  const PassportStrategy = passportMod.Strategy;
+  const strategy = new PassportStrategy(({ client: oidcClient, params: { scope: "openid email profile" } } as any), verify);
 
   passport.use(strategy);
 
@@ -149,20 +166,20 @@ export async function setupAuth(app: Express) {
 
   app.get(
     "/api/login",
-    passport.authenticate(strategyName, {
+    passport.authenticate(strategyName, ({
       prompt: "consent",
       scope: ["openid", "email", "profile"],
       // Request offline access so Google returns a refresh token
       access_type: "offline",
-    })
+    } as any))
   );
 
   app.get(
     "/api/callback",
-    passport.authenticate(strategyName, {
+    passport.authenticate(strategyName, ({
       successReturnToOrRedirect: process.env.APP_ORIGIN ?? "/",
       failureRedirect: "/api/login",
-    })
+    } as any))
   );
 
   app.get("/api/logout", (req, res) => {
