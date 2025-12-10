@@ -29,8 +29,8 @@ In your Render dashboard, go to your web service → Environment tab, and add th
 |--------------|-------|-------|
 | `DATABASE_URL` | `postgresql://neondb_owner:npg_UscCMPlIZ97y@ep-still-snow-adag1fx7-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require` | Your Neon connection string |
 | `SESSION_SECRET` | `m3huWCGSPIwvZFGxRL0NgAptCL9j0w+rX+Dc041iEXA=` | Random 32+ character string |
-| `REPL_ID` | `dummy-repl-id` | Any string (auth won't work but app won't crash) |
-| `ISSUER_URL` | `https://replit.com/oidc` | Optional, defaults to this |
+| `GOOGLE_CLIENT_ID` | `your-google-client-id` | OAuth client ID from Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | `your-google-client-secret` | OAuth client secret from Google Cloud |
 
 ### Copy-Paste Values:
 
@@ -44,22 +44,26 @@ postgresql://neondb_owner:npg_UscCMPlIZ97y@ep-still-snow-adag1fx7-pooler.c-2.us-
 m3huWCGSPIwvZFGxRL0NgAptCL9j0w+rX+Dc041iEXA=
 ```
 
-**REPL_ID:**
+**GOOGLE_CLIENT_ID:**
 ```
-dummy-repl-id
+your-google-client-id
+```
+
+**GOOGLE_CLIENT_SECRET:**
+```
+your-google-client-secret
 ```
 
 ## Important Notes
 
-- **Authentication won't work** outside Replit (Replit Auth is Replit-specific)
+- **Authentication**: The server now uses Google OAuth. Configure OAuth credentials in Google Cloud and set the correct callback URL (`GOOGLE_CALLBACK_URL`) to match your deployment origin.
 - **Guest mode will work fine** - users can use the app without signing in
 - The app will store data in the browser's localStorage in guest mode
-- If you want real authentication later, you'd need to set up Google OAuth or another provider
 
 ## Testing
 
 After deploying:
 - The backend should start successfully
 - Guest mode on the frontend will work
-- Sign-in buttons won't work (expected - Replit Auth doesn't work outside Replit)
+- Sign-in buttons should work if Google OAuth is configured correctly
 

@@ -15,7 +15,7 @@ A full-stack web application for managing baseball teams, rosters, and generatin
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
 - **Backend**: Express + TypeScript
 - **Database**: Drizzle ORM with Neon PostgreSQL
-- **Authentication**: Replit Auth (Google OAuth)
+- **Authentication**: Google OAuth
 
 ## Free Hosting Setup
 
@@ -38,7 +38,7 @@ The frontend is automatically deployed to GitHub Pages via GitHub Actions.
    - **Build Command**: `npm install && npm run build`
    - **Start Command**: `npm start`
    - **Environment**: Node
-5. Add environment variables (from your `.env` or Replit secrets)
+5. Add environment variables (from your `.env`)
 6. Get your backend URL (e.g., `https://your-app.onrender.com`)
 
 ### Configure Frontend to Use Backend

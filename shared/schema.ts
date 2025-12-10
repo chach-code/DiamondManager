@@ -3,7 +3,7 @@ import { pgTable, text, varchar, timestamp, index, jsonb } from "drizzle-orm/pg-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Sessions table (required for Replit Auth)
+// Sessions table (for session store)
 export const sessions = pgTable(
   "sessions",
   {
@@ -14,7 +14,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// Users table (Replit Auth)
+// Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey(),
   email: varchar("email").unique(),
@@ -57,7 +57,7 @@ export const lineups = pgTable("lineups", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Types for Replit Auth
+// Types for auth
 export type User = typeof users.$inferSelect;
 export type UpsertUser = {
   id: string;

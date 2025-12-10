@@ -16,7 +16,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
 

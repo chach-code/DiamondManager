@@ -11,10 +11,12 @@
    
    Create a `.env` file in the root directory with:
    ```env
-   DATABASE_URL=postgresql://neondb_owner:npg_UscCMPlIZ97y@ep-still-snow-adag1fx7-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-   SESSION_SECRET=m3huWCGSPIwvZFGxRL0NgAptCL9j0w+rX+Dc041iEXA=
-   REPL_ID=dummy-repl-id
-   ISSUER_URL=https://replit.com/oidc
+   DATABASE_URL=postgresql://user:password@host:port/dbname?sslmode=require
+   SESSION_SECRET=your-session-secret
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   # Optional: override callback URL
+   GOOGLE_CALLBACK_URL=http://localhost:5000/api/callback
    PORT=5000
    ```
 
@@ -87,7 +89,8 @@ PORT=3000 npm run dev
 ## Development Tips
 
 1. **Guest Mode**: Works without backend - data stored in browser localStorage
-2. **Authentication**: Won't work locally (Replit Auth is Replit-specific)
+2. **Authentication**: Local development requires setting up Google OAuth credentials and callback URL; use Guest Mode for quick testing
 3. **Database**: Uses your Neon database (same as production)
 4. **Hot Reload**: Changes to frontend code will auto-reload in browser
+
 
