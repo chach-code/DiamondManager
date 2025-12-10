@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation as useWouterLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation as useWouterLocation, useRoute } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,7 +13,11 @@ import NotFound from "@/pages/not-found";
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
   const base = getBasePath();
-  const basePath = base ? `${base}/` : "/";
+  const [location] = useWouterLocation();
+  
+  // For local development (no base path), use "/"
+  // For GitHub Pages (with base path), use the base path
+  const rootPath = base ? `${base}/` : "/";
 
   if (isLoading) {
     return (
@@ -23,16 +27,36 @@ function AppRouter() {
     );
   }
 
+  // Debug: log routing info (remove in production)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Router Debug:', { 
+      location, 
+      base, 
+      rootPath, 
+      isAuthenticated, 
+      isLoading 
+    });
+  }
+
+  // Match root path with or without trailing slash
+  const rootPaths = base 
+    ? [`${base}`, `${base}/`] 
+    : ["/"];
+  
   return (
     <Switch>
       {!isAuthenticated ? (
         <>
-          <Route path={basePath} component={Landing} />
+          {rootPaths.map(path => (
+            <Route key={path} path={path} component={Landing} />
+          ))}
           <Route component={NotFound} />
         </>
       ) : (
         <>
-          <Route path={basePath} component={Home} />
+          {rootPaths.map(path => (
+            <Route key={path} path={path} component={Home} />
+          ))}
           <Route component={NotFound} />
         </>
       )}
