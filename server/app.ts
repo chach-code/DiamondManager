@@ -30,13 +30,25 @@ declare module 'http' {
 }
 
 // Configure CORS to allow requests from GitHub Pages
+// Build allowed origins dynamically so deployments can set `APP_ORIGIN`.
+const allowedOrigins = [
+  process.env.APP_ORIGIN,
+  'https://chach-code.github.io',
+  'http://localhost:5173', // For local development (Vite)
+  `http://localhost:${process.env.PORT ?? '5000'}`, // Local server
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: [
-    'https://chach-code.github.io',
-    'http://localhost:5173', // For local development
-    'http://localhost:5000', // For local development
-  ],
-  credentials: true, // Allow cookies/sessions
+  origin: (origin, cb) => {
+    // Allow requests with no origin (e.g., mobile clients, curl) and
+    // allow origins present in allowedOrigins.
+    if (!origin || allowedOrigins.includes(origin)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('CORS origin denied'));
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -101,7 +113,7 @@ export default async function runApp(
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   
-  // For local development, bind to localhost; for production (Replit/Render), use 0.0.0.0
+  // For local development, bind to localhost; for production use 0.0.0.0
   const host = process.env.NODE_ENV === 'production' ? "0.0.0.0" : "localhost";
   
   server.listen(port, host, () => {
