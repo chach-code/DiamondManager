@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertTeamSchema, insertPlayerSchema, insertLineupSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -183,6 +183,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to delete lineup" });
     }
   });
+
+  // Dev-only debug endpoint to inspect session and user data
+  if (process.env.NODE_ENV !== "production") {
+    app.get("/api/debug/session", (req: any, res) => {
+      try {
+        // Do not accidentally leak sensitive info in production — this route
+        // is only enabled in non-production environments.
+        const session = req.session || null;
+        const user = req.user || null;
+        res.json({ session, user });
+      } catch (err) {
+        console.error("Debug endpoint error:", err);
+        res.status(500).json({ message: "Debug endpoint failed" });
+      }
+    });
+  }
 
   const httpServer = createServer(app);
   return httpServer;
