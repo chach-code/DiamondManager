@@ -76,8 +76,8 @@ function BasePathSync() {
       if (location !== expectedLocation) {
         // Update the browser URL without triggering navigation
         window.history.replaceState(null, '', expectedLocation);
-        // Also update wouter's internal state
-        setLocation(expectedLocation, true);
+        // Also update wouter's internal state (pass options object)
+        setLocation(expectedLocation, { replace: true } as any);
       }
     }
   }, [base, location, setLocation]);

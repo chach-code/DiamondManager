@@ -12,7 +12,10 @@ export function useLocation() {
   // Custom setLocation that adds base path
   const setLocationWithBase = (path: string, replace?: boolean) => {
     const pathWithBase = addBasePath(path);
-    setLocation(pathWithBase, replace);
+    // wouter expects an options object like { replace?: boolean }
+    const options = typeof replace === 'boolean' ? { replace } : undefined;
+    // Cast to any because wouter types may vary between versions
+    setLocation(pathWithBase, options as any);
   };
   
   return [pathWithoutBase, setLocationWithBase] as const;
