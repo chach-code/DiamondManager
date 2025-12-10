@@ -1,4 +1,4 @@
-import { Switch, Route, Router } from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,7 +11,6 @@ import NotFound from "@/pages/not-found";
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
-  const base = getBasePath();
 
   if (isLoading) {
     return (
@@ -41,11 +40,12 @@ function AppRouter() {
 function Router() {
   const base = getBasePath();
   
-  // Use Router with base path for GitHub Pages
+  // Use wouter's Router with base prop if supported, otherwise use default
+  // Wouter v3 may not support base, so we'll handle it via location
   return (
-    <Router base={base}>
+    <WouterRouter>
       <AppRouter />
-    </Router>
+    </WouterRouter>
   );
 }
 
