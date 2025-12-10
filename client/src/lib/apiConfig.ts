@@ -4,9 +4,14 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export function getApiUrl(path: string): string {
-  // Remove leading slash if API_BASE_URL is set (it will have trailing slash)
-  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-  return API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : path;
+  if (!API_BASE_URL) {
+    return path;
+  }
+  
+  // Ensure base URL has trailing slash and path has leading slash
+  const base = API_BASE_URL.endsWith("/") ? API_BASE_URL : `${API_BASE_URL}/`;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath.slice(1)}`; // Remove leading slash from path since base has it
 }
 
 // Helper for navigation to API endpoints (like login/logout)
