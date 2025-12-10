@@ -14,11 +14,11 @@ import memorystore from "memorystore";
 export const getOidcConfig = memoize(
   async () => {
     // Dynamically import openid-client to avoid differing export styles
-    // between dev and production bundles. Resolve Issuer from possible
-    // locations (named export, default export, or the module itself).
+    // between dev and production bundles. We'll prefer the legacy
+    // `Issuer.discover(...).Client` shape if available; otherwise use the
+    // v6+ `discovery(server, clientId, clientSecret)` API that returns a
+    // Configuration instance.
     const clientModule: any = await import('openid-client');
-    const IssuerCtor = clientModule.Issuer ?? clientModule.default?.Issuer ?? clientModule;
-    const issuer = await IssuerCtor.discover("https://accounts.google.com");
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -32,14 +32,34 @@ export const getOidcConfig = memoize(
     // is reachable (e.g. https://diamondmanager-backend.onrender.com).
     const redirect = process.env.GOOGLE_CALLBACK_URL ?? `${process.env.BACKEND_ORIGIN ?? process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5000}`}/api/callback`;
 
-    const oidcClient = new issuer.Client({
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uris: [redirect],
-      response_types: ["code"],
-    });
+    // Try legacy Issuer if present
+    const IssuerCtor = clientModule.Issuer ?? clientModule.default?.Issuer;
+    if (typeof IssuerCtor?.discover === 'function') {
+      const issuerInstance = await IssuerCtor.discover(new URL("https://accounts.google.com"));
+      const legacyClient = new issuerInstance.Client({
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uris: [redirect],
+        response_types: ["code"],
+      });
+      return { mode: 'legacy', client: legacyClient, module: clientModule } as any;
+    }
 
-    return oidcClient;
+    // Fallback to modern discovery API (v6+). Log inputs for easier debugging
+    // in environments like Render where errors surfaced earlier.
+    if (typeof clientModule.discovery === 'function') {
+      console.debug('openid-client.discovery detected. clientId:', String(clientId), 'redirect:', redirect);
+      try {
+        const config = await clientModule.discovery(new URL("https://accounts.google.com"), clientId, clientSecret);
+        return { mode: 'modern', config, module: clientModule } as any;
+      } catch (err) {
+        console.error('openid-client.discovery failed:', err);
+        throw err;
+      }
+    }
+
+    console.error('openid-client does not expose Issuer.discover or discovery. Module keys:', Object.keys(clientModule));
+    throw new Error('Unsupported openid-client API shape; cannot construct OIDC client');
   },
   { maxAge: 3600 * 1000 }
 );
@@ -124,7 +144,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const oidcClient = await getOidcConfig();
+  const oidc = await getOidcConfig();
 
   const verify: any = async (
     // Use a loose `any` here to avoid runtime/compile mismatches from the
@@ -151,15 +171,27 @@ export async function setupAuth(app: Express) {
 
   const strategyName = "google";
 
-  // Load the passport strategy dynamically so tests that import this
-  // module don't attempt to load `openid-client/passport` (which can be
-  // ESM-only and cause Jest to fail parsing node_modules). This import is
-  // executed only when the server actually sets up auth.
-  const passportMod: any = await import('openid-client/passport');
-  const PassportStrategy = passportMod.Strategy;
-  const strategy = new PassportStrategy(({ client: oidcClient, params: { scope: "openid email profile" } } as any), verify);
+  // Load the passport strategy dynamically. Prefer a Strategy export from
+  // `openid-client` if present (v6+ may export it), otherwise fall back to
+  // the `openid-client/passport` entrypoint. This keeps tests free of
+  // node_modules ESM parsing until the server is actually started.
+  const clientModuleForStrategy: any = await import('openid-client');
+  let PassportStrategy: any = clientModuleForStrategy.Strategy ?? clientModuleForStrategy.Strategy;
+  if (!PassportStrategy) {
+    const passportMod: any = await import('openid-client/passport');
+    PassportStrategy = passportMod.Strategy;
+  }
 
-  passport.use(strategy);
+  let strategy: any;
+  if ((oidc as any).mode === 'legacy') {
+    strategy = new PassportStrategy(({ client: (oidc as any).client, params: { scope: "openid email profile" } } as any), verify);
+  } else {
+    strategy = new PassportStrategy(({ config: (oidc as any).config, params: { scope: "openid email profile" } } as any), verify);
+  }
+
+  // Register the strategy explicitly under the `google` name so that
+  // `passport.authenticate('google')` always picks the expected strategy.
+  passport.use(strategyName, strategy);
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
@@ -208,8 +240,14 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   try {
-    const oidcClient = await getOidcConfig();
-    const tokenResponse = await oidcClient.refresh(refreshToken as string);
+    const oidc = await getOidcConfig();
+    let tokenResponse: any;
+    if ((oidc as any).mode === 'legacy') {
+      tokenResponse = await (oidc as any).client.refresh(refreshToken as string);
+    } else {
+      // modern openid-client: use refreshTokenGrant(config, refreshToken)
+      tokenResponse = await (oidc as any).module.refreshTokenGrant((oidc as any).config, refreshToken as string);
+    }
     // Update session user with refreshed tokens and claims
     user.claims = tokenResponse.claims();
     user.access_token = tokenResponse.access_token;
