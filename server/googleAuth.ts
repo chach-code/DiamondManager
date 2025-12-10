@@ -1,4 +1,6 @@
-import { Issuer } from "openid-client";
+// Import openid-client dynamically inside the OIDC helper to avoid runtime
+// ESM/CJS export shape differences after bundling. We'll resolve `Issuer`
+// from either the named export or the default export.
 import { Strategy, type VerifyFunction } from "openid-client/passport";
 
 import passport from "passport";
@@ -9,9 +11,14 @@ import connectPg from "connect-pg-simple";
 import memorystore from "memorystore";
 import { storage } from "./storage";
 
-const getOidcConfig = memoize(
+export const getOidcConfig = memoize(
   async () => {
-    const issuer = await Issuer.discover("https://accounts.google.com");
+    // Dynamically import openid-client to avoid differing export styles
+    // between dev and production bundles. Resolve Issuer from possible
+    // locations (named export, default export, or the module itself).
+    const clientModule: any = await import('openid-client');
+    const IssuerCtor = clientModule.Issuer ?? clientModule.default?.Issuer ?? clientModule;
+    const issuer = await IssuerCtor.discover("https://accounts.google.com");
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
