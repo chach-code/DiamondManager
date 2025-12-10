@@ -1,4 +1,4 @@
-import * as client from "openid-client";
+import { Issuer } from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
 
 import passport from "passport";
@@ -103,7 +103,9 @@ export async function setupAuth(app: Express) {
   const oidcClient = await getOidcConfig();
 
   const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+    // Use a loose `any` here to avoid runtime/compile mismatches from the
+    // underlying openid-client types when compiled and bundled for deploy.
+    tokens: any,
     verified: passport.AuthenticateCallback
   ) => {
     const user: any = {};
