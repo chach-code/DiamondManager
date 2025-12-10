@@ -1,4 +1,14 @@
+// Load environment variables FIRST before any other imports
 import "dotenv/config";
+
+// Verify DATABASE_URL is set before importing modules that need it
+if (!process.env.DATABASE_URL) {
+  console.error("❌ DATABASE_URL is not set!");
+  console.error("Please create a .env file with your database credentials.");
+  console.error("You can copy .env.example to .env and fill in the values.");
+  process.exit(1);
+}
+
 import fs from "node:fs";
 import path from "node:path";
 import { type Server } from "node:http";

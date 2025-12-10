@@ -100,11 +100,14 @@ export default async function runApp(
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  
+  // For local development, bind to localhost; for production (Replit/Render), use 0.0.0.0
+  const host = process.env.NODE_ENV === 'production' ? "0.0.0.0" : "localhost";
+  
+  server.listen(port, host, () => {
+    log(`serving on ${host}:${port}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`\n🌐 Open http://localhost:${port} in your browser\n`);
+    }
   });
 }
