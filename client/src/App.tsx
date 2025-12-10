@@ -1,16 +1,19 @@
-import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation as useWouterLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
-import { getBasePath } from "@/lib/basePath";
+import { getBasePath, stripBasePath, addBasePath } from "@/lib/basePath";
+import { useEffect } from "react";
 import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
   const { isAuthenticated, isLoading } = useAuth();
+  const base = getBasePath();
+  const basePath = base ? `${base}/` : "/";
 
   if (isLoading) {
     return (
@@ -24,12 +27,12 @@ function AppRouter() {
     <Switch>
       {!isAuthenticated ? (
         <>
-          <Route path="/" component={Landing} />
+          <Route path={basePath} component={Landing} />
           <Route component={NotFound} />
         </>
       ) : (
         <>
-          <Route path="/" component={Home} />
+          <Route path={basePath} component={Home} />
           <Route component={NotFound} />
         </>
       )}
@@ -37,13 +40,33 @@ function AppRouter() {
   );
 }
 
-function Router() {
+// Custom Router that syncs wouter's location with the base path
+function BasePathSync() {
   const base = getBasePath();
+  const [location, setLocation] = useWouterLocation();
   
-  // Use wouter's Router with base prop if supported, otherwise use default
-  // Wouter v3 may not support base, so we'll handle it via location
+  useEffect(() => {
+    // If we have a base path and location doesn't start with it, fix it
+    if (base) {
+      const pathWithoutBase = stripBasePath(location);
+      const expectedLocation = addBasePath(pathWithoutBase);
+      
+      if (location !== expectedLocation) {
+        // Update the browser URL without triggering navigation
+        window.history.replaceState(null, '', expectedLocation);
+        // Also update wouter's internal state
+        setLocation(expectedLocation, true);
+      }
+    }
+  }, [base, location, setLocation]);
+  
+  return null;
+}
+
+function Router() {
   return (
     <WouterRouter>
+      <BasePathSync />
       <AppRouter />
     </WouterRouter>
   );
