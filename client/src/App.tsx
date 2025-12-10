@@ -38,25 +38,21 @@ function AppRouter() {
     });
   }
 
-  // Match root path with or without trailing slash
-  const rootPaths = base 
-    ? [`${base}`, `${base}/`] 
-    : ["/"];
+  // Normalize root path - ensure it ends with / for matching
+  const normalizedRootPath = rootPath.endsWith('/') ? rootPath : `${rootPath}/`;
   
   return (
     <Switch>
       {!isAuthenticated ? (
         <>
-          {rootPaths.map(path => (
-            <Route key={path} path={path} component={Landing} />
-          ))}
+          <Route path={normalizedRootPath} component={Landing} />
+          <Route path={rootPath} component={Landing} />
           <Route component={NotFound} />
         </>
       ) : (
         <>
-          {rootPaths.map(path => (
-            <Route key={path} path={path} component={Home} />
-          ))}
+          <Route path={normalizedRootPath} component={Home} />
+          <Route path={rootPath} component={Home} />
           <Route component={NotFound} />
         </>
       )}
@@ -70,7 +66,7 @@ function BasePathSync() {
   const [location, setLocation] = useWouterLocation();
   
   useEffect(() => {
-    // If we have a base path and location doesn't start with it, fix it
+    // Only sync if we have a base path (GitHub Pages)
     if (base) {
       const pathWithoutBase = stripBasePath(location);
       const expectedLocation = addBasePath(pathWithoutBase);
