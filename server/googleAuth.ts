@@ -11,7 +11,7 @@ import { storage } from "./storage";
 
 const getOidcConfig = memoize(
   async () => {
-    const issuer = await client.Issuer.discover("https://accounts.google.com");
+    const issuer = await Issuer.discover("https://accounts.google.com");
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
