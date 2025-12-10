@@ -6,44 +6,58 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import memorystore from "memorystore";
 import { storage } from "./storage";
 
-const getOidcClient = memoize(
+const getOidcConfig = memoize(
   async () => {
-    const issuer = await client.Issuer.discover("https://accounts.google.com");
-    const redirect = process.env.GOOGLE_CALLBACK_URL ?? 
-      `${process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5000}`}/api/callback`;
-
-    const oauthClient = new issuer.Client({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uris: [redirect],
-      response_types: ["code"],
-    });
-
-    return { issuer, oauthClient };
+    const config = await client.discovery(new URL("https://accounts.google.com"), process.env.GOOGLE_CLIENT_ID!);
+    return config;
   },
   { maxAge: 3600 * 1000 }
 );
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  // If DATABASE_URL is provided and DEV_USE_MEMORY_STORE is not set, use
+  // PostgreSQL-backed session store. Otherwise, fall back to an in-memory
+  // store (suitable for local development / testing).
+  const usePg = !!process.env.DATABASE_URL && process.env.DEV_USE_MEMORY_STORE !== "true";
+
+  if (usePg) {
+    const pgStore = connectPg(session);
+    const sessionStore = new pgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true,
+      ttl: sessionTtl,
+      tableName: "sessions",
+    });
+    return session({
+      secret: process.env.SESSION_SECRET!,
+      store: sessionStore,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        // Only mark cookie as secure in production (HTTPS). This allows local
+        // development over HTTP while keeping cookies secure in deployed envs.
+        secure: process.env.NODE_ENV === "production",
+        maxAge: sessionTtl,
+      },
+    });
+  }
+
+  // Fallback: in-memory store (memorystore) for local dev. Not suitable for
+  // production, but convenient while developing without a database.
+  const MemoryStore = memorystore(session);
+  const memoryStore = new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 });
   return session({
-    secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
+    secret: process.env.SESSION_SECRET || "dev-secret",
+    store: memoryStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      // Only mark cookie as secure in production (HTTPS). This allows local
-      // development over HTTP while keeping cookies secure in deployed envs.
       secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
     },
@@ -66,7 +80,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const { oauthClient } = await getOidcClient();
+  const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
@@ -82,22 +96,31 @@ export async function setupAuth(app: Express) {
   };
 
   const strategyName = "google";
+  const redirect = process.env.GOOGLE_CALLBACK_URL ?? `${process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5000}`}/api/callback`;
+
   const strategy = new Strategy(
     {
-      client: oauthClient,
-      params: { scope: "openid email profile" },
+      name: strategyName,
+      config,
+      scope: "openid email profile",
+      callbackURL: redirect,
     },
-    verify
+    verify,
   );
 
-  passport.use(strategyName, strategy as any);
+  passport.use(strategy);
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get(
     "/api/login",
-    passport.authenticate(strategyName, { prompt: "consent", scope: ["openid", "email", "profile"] })
+    passport.authenticate(strategyName, {
+      prompt: "consent",
+      scope: ["openid", "email", "profile"],
+      // Request offline access so Google returns a refresh token
+      access_type: "offline",
+    })
   );
 
   app.get(
@@ -128,7 +151,21 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (now <= user.expires_at) {
     return next();
   }
+  const refreshToken = user.refresh_token;
+  if (!refreshToken) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
 
-  // If expired, require re-authentication.
-  return res.status(401).json({ message: "Unauthorized" });
+  try {
+    const config = await getOidcConfig();
+    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+    // Update session user with refreshed tokens and claims
+    user.claims = tokenResponse.claims();
+    user.access_token = tokenResponse.access_token;
+    user.refresh_token = tokenResponse.refresh_token || user.refresh_token;
+    user.expires_at = user.claims?.exp;
+    return next();
+  } catch (error) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
 };

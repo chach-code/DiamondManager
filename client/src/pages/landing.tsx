@@ -12,7 +12,7 @@ export default function Landing() {
   const handleGuestMode = () => {
     localStorage.setItem("guestMode", "true");
     const base = getBasePath();
-    setLocation(base ? `${base}/` : "/");
+    setLocation(base ? `${base}/app` : "/app");
   };
 
   return (
