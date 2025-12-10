@@ -45,45 +45,50 @@ export default function PositionLineup({ players, positions, onGenerate }: Posit
       {hasPositions && (
         <div className="relative w-full max-w-3xl mx-auto" style={{ paddingBottom: '100%' }}>
           <div className="absolute inset-0">
-            <img 
-              src={baseballFieldImage} 
-              alt="Baseball field" 
-              className="absolute inset-0 w-full h-full object-contain rounded-lg"
-            />
+              <img 
+                src={baseballFieldImage} 
+                alt="Baseball field" 
+                className="absolute inset-0 w-full h-full object-cover rounded-lg"
+              />
 
-            <div className="absolute top-[76%] left-1/2 -translate-x-1/2">
+            {/* Home/umpire area */}
+            <div className="absolute top-[78%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="C" player={positions.C} />
             </div>
 
-            <div className="absolute top-[55%] left-1/2 -translate-x-1/2 -translate-y-1/2">
+            {/* Pitcher */}
+            <div className="absolute top-[62%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="P" player={positions.P} />
             </div>
 
-            <div className="absolute top-[55%] right-[24%] -translate-y-1/2">
+            {/* Corners */}
+            <div className="absolute top-[56%] right-[22%] transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="1B" player={positions["1B"]} />
             </div>
 
-            <div className="absolute top-[38%] right-[34%]">
-              <PositionMarker position="2B" player={positions["2B"]} />
-            </div>
-
-            <div className="absolute top-[55%] left-[24%] -translate-y-1/2">
+            <div className="absolute top-[56%] left-[22%] transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="3B" player={positions["3B"]} />
             </div>
 
-            <div className="absolute top-[38%] left-[34%]">
+            {/* Middle infield */}
+            <div className="absolute top-[36%] right-[36%] transform -translate-x-1/2 -translate-y-1/2 z-10">
+              <PositionMarker position="2B" player={positions["2B"]} />
+            </div>
+
+            <div className="absolute top-[36%] left-[36%] transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="SS" player={positions.SS} />
             </div>
 
-            <div className="absolute top-[18%] left-[12%]">
+            {/* Outfield */}
+            <div className="absolute top-[22%] left-[14%] transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="LF" player={positions.LF} />
             </div>
 
-            <div className="absolute top-[14%] left-1/2 -translate-x-1/2">
+            <div className="absolute top-[12%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="CF" player={positions.CF} />
             </div>
 
-            <div className="absolute top-[18%] right-[12%]">
+            <div className="absolute top-[22%] right-[14%] transform -translate-x-1/2 -translate-y-1/2 z-10">
               <PositionMarker position="RF" player={positions.RF} />
             </div>
           </div>
@@ -106,7 +111,7 @@ function PositionMarker({ position, player }: { position: string; player: Player
   if (!player) {
     return (
       <div className="flex flex-col items-center" data-testid={`card-position-${position}`}>
-        <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-1">
+        <div className="w-10 h-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-1 bg-white/60">
           <span className="text-xs font-semibold text-muted-foreground">{position}</span>
         </div>
       </div>
@@ -115,16 +120,16 @@ function PositionMarker({ position, player }: { position: string; player: Player
 
   return (
     <div className="flex flex-col items-center" data-testid={`card-position-${position}`}>
-      <div className="w-14 h-14 rounded-full bg-primary border-2 border-primary-border flex items-center justify-center mb-1 shadow-md">
-        <span className="text-2xl font-bold text-primary-foreground">
+      <div className="w-12 h-12 rounded-full bg-primary border-2 border-primary-border flex items-center justify-center mb-1 shadow-md">
+        <span className="text-xl font-bold text-primary-foreground">
           {player.number}
         </span>
       </div>
-      <div className="text-center bg-card px-2 py-1 rounded-md shadow-sm border border-card-border">
+      <div className="text-center bg-card px-2 py-1 rounded-md shadow-sm border border-card-border max-w-[120px]">
         <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
           {position}
         </div>
-        <div className="text-xs font-semibold whitespace-nowrap" data-testid={`text-position-name-${position}`}>
+        <div className="text-xs font-semibold truncate" data-testid={`text-position-name-${position}`}>
           {player.name}
         </div>
       </div>
