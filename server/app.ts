@@ -6,6 +6,7 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import cors from "cors";
 
 import { registerRoutes } from "./routes";
 
@@ -27,6 +28,19 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+// Configure CORS to allow requests from GitHub Pages
+app.use(cors({
+  origin: [
+    'https://chach-code.github.io',
+    'http://localhost:5173', // For local development
+    'http://localhost:5000', // For local development
+  ],
+  credentials: true, // Allow cookies/sessions
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
