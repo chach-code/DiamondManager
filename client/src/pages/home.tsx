@@ -9,6 +9,7 @@ import BattingLineup from "@/components/BattingLineup";
 import PositionLineup from "@/components/PositionLineup";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
+import { getApiNavUrl } from "@/lib/apiConfig";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 
 const DEMO_PLAYERS: Player[] = [
@@ -40,7 +41,7 @@ export default function Home() {
       localStorage.removeItem("guestMode");
       setLocation("/");
     } else {
-      window.location.href = "/api/logout";
+      window.location.href = getApiNavUrl("/api/logout");
     }
   };
 
@@ -104,7 +105,7 @@ export default function Home() {
           <p className="text-sm text-amber-800 dark:text-amber-200">
             You're in guest mode. Your lineups won't be saved. 
             <button 
-              onClick={() => window.location.href = "/api/login"}
+              onClick={() => window.location.href = getApiNavUrl("/api/login")}
               data-testid="button-sign-in-banner"
               className="ml-2 underline hover:opacity-80 font-medium"
             >

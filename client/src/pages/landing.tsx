@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 import { Users, Target, Zap } from "lucide-react";
+import { getApiNavUrl } from "@/lib/apiConfig";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
@@ -32,7 +33,7 @@ export default function Landing() {
           <div className="flex gap-4 flex-wrap justify-center">
             <Button
               size="lg"
-              onClick={() => window.location.href = "/api/login"}
+              onClick={() => window.location.href = getApiNavUrl("/api/login")}
               data-testid="button-signin"
             >
               Sign In with Google
@@ -88,7 +89,7 @@ export default function Landing() {
           <div className="flex gap-4 flex-wrap justify-center">
             <Button
               size="lg"
-              onClick={() => window.location.href = "/api/login"}
+              onClick={() => window.location.href = getApiNavUrl("/api/login")}
               data-testid="button-signin-cta"
             >
               Sign In Now
