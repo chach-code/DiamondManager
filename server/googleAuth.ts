@@ -35,14 +35,18 @@ export const getOidcConfig = memoize(
     // Try legacy Issuer if present
     const IssuerCtor = clientModule.Issuer ?? clientModule.default?.Issuer;
     if (typeof IssuerCtor?.discover === 'function') {
-      const issuerInstance = await IssuerCtor.discover(new URL("https://accounts.google.com"));
+      // keep test compatibility by calling discover with a string
+      const issuerInstance = await IssuerCtor.discover("https://accounts.google.com");
       const legacyClient = new issuerInstance.Client({
         client_id: clientId,
         client_secret: clientSecret,
         redirect_uris: [redirect],
         response_types: ["code"],
       });
-      return { mode: 'legacy', client: legacyClient, module: clientModule } as any;
+      // Maintain backward compatibility: return the client instance directly
+      // (previous behaviour) so existing tests and call sites that expect the
+      // client continue to work.
+      return legacyClient as any;
     }
 
     // Fallback to modern discovery API (v6+). Log inputs for easier debugging
@@ -183,10 +187,12 @@ export async function setupAuth(app: Express) {
   }
 
   let strategy: any;
-  if ((oidc as any).mode === 'legacy') {
-    strategy = new PassportStrategy(({ client: (oidc as any).client, params: { scope: "openid email profile" } } as any), verify);
-  } else {
+  const isModern = !!(oidc && (oidc as any).mode === 'modern');
+  if (isModern) {
     strategy = new PassportStrategy(({ config: (oidc as any).config, params: { scope: "openid email profile" } } as any), verify);
+  } else {
+    // assume `oidc` is the legacy client instance (returned directly by getOidcConfig)
+    strategy = new PassportStrategy(({ client: (oidc as any), params: { scope: "openid email profile" } } as any), verify);
   }
 
   // Register the strategy explicitly under the `google` name so that
@@ -242,11 +248,12 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   try {
     const oidc = await getOidcConfig();
     let tokenResponse: any;
-    if ((oidc as any).mode === 'legacy') {
-      tokenResponse = await (oidc as any).client.refresh(refreshToken as string);
-    } else {
+    if (oidc && (oidc as any).mode === 'modern') {
       // modern openid-client: use refreshTokenGrant(config, refreshToken)
       tokenResponse = await (oidc as any).module.refreshTokenGrant((oidc as any).config, refreshToken as string);
+    } else {
+      // legacy client instance returned directly by getOidcConfig
+      tokenResponse = await (oidc as any).refresh(refreshToken as string);
     }
     // Update session user with refreshed tokens and claims
     user.claims = tokenResponse.claims();
