@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { addBasePath } from "@/lib/basePath";
+import { addBasePath, getBasePath } from "@/lib/basePath";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Users, Trash2, FlaskConical, LogOut, AlertCircle } from "lucide-react";
@@ -40,7 +40,8 @@ export default function Home() {
   const handleLogout = () => {
     if (isGuestMode) {
       localStorage.removeItem("guestMode");
-      setLocation("/");
+      const base = getBasePath();
+      setLocation(base ? `${base}/` : "/");
     } else {
       window.location.href = getApiNavUrl("/api/logout");
     }

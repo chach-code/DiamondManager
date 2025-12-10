@@ -4,13 +4,15 @@ import { useLocation } from "wouter";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 import { Users, Target, Zap } from "lucide-react";
 import { getApiNavUrl } from "@/lib/apiConfig";
+import { getBasePath } from "@/lib/basePath";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
 
   const handleGuestMode = () => {
     localStorage.setItem("guestMode", "true");
-    setLocation("/");
+    const base = getBasePath();
+    setLocation(base ? `${base}/` : "/");
   };
 
   return (
