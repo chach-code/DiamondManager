@@ -3,22 +3,25 @@
 console.log('>>> running googleAuth tests');
 
 let getOidcConfig: any;
-const mockDiscover = jest.fn();
+const mockDiscovery = jest.fn();
+const mockClientSecretPost = jest.fn();
 
 beforeEach(async () => {
   jest.resetModules();
-  mockDiscover.mockReset();
+  mockDiscovery.mockReset();
+  mockClientSecretPost.mockReset();
   // Do a module mock before importing the module under test
-  // Provide a default FakeIssuer so discovery always resolves to a usable
-  // issuer (the function under test discovers the issuer before validating
-  // env vars).
-  const DefaultIssuer = class {
-    static Client = function (opts: any) {
-      return {};
-    };
-  } as any;
-  mockDiscover.mockResolvedValue(DefaultIssuer);
-  jest.doMock('openid-client', () => ({ Issuer: { discover: mockDiscover } }));
+  // v6 API: Use 'discovery' function instead of 'Issuer.discover'
+  // Provide a default Configuration object so discovery always resolves
+  const DefaultConfig = {
+    issuer: new URL('https://accounts.google.com'),
+  };
+  mockDiscovery.mockResolvedValue(DefaultConfig);
+  mockClientSecretPost.mockReturnValue(() => {}); // Return auth function
+  jest.doMock('openid-client', () => ({ 
+    discovery: mockDiscovery,
+    ClientSecretPost: mockClientSecretPost,
+  }));
   const mod = await import('../googleAuth');
   getOidcConfig = mod.getOidcConfig;
 });
@@ -48,25 +51,30 @@ describe('googleAuth getOidcConfig', () => {
     }
   });
 
-  test('returns client when envs present and issuer resolves', async () => {
+  test('returns config when envs present and discovery resolves', async () => {
     process.env.GOOGLE_CLIENT_ID = 'fake-id';
     process.env.GOOGLE_CLIENT_SECRET = 'fake-secret';
     process.env.BACKEND_ORIGIN = 'https://example-backend.test';
 
-    // Mock issuer.discover to return an object with a Client constructor
-    const fakeClientInstance = { foo: 'bar' };
-    const FakeIssuer = class {
-      static Client = function (opts: any) {
-        return fakeClientInstance;
-      };
-    } as any;
-
-    mockDiscover.mockResolvedValue(FakeIssuer);
+    // Mock discovery to return a Configuration object (v6 API)
+    const fakeConfig = { 
+      issuer: new URL('https://accounts.google.com'),
+      foo: 'bar' 
+    };
+    mockDiscovery.mockResolvedValue(fakeConfig);
 
     try {
-      const client = await getOidcConfig();
-      expect(client).toBe(fakeClientInstance);
-      expect(mockDiscover).toHaveBeenCalledWith('https://accounts.google.com');
+      const config = await getOidcConfig();
+      expect(config).toBe(fakeConfig);
+      // v6 API: discovery is called with URL, clientId, clientSecret, ClientSecretPost
+      expect(mockDiscovery).toHaveBeenCalledWith(
+        expect.any(URL),
+        'fake-id',
+        'fake-secret',
+        expect.any(Function)
+      );
+      const callUrl = (mockDiscovery.mock.calls[0][0] as URL).href;
+      expect(callUrl).toBe('https://accounts.google.com/');
     } catch (err) {
       console.log('unexpected error:', err);
       throw err;
