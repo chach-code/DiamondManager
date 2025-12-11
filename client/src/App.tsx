@@ -18,6 +18,7 @@ function AppRouter() {
   const [, setLocationLocal] = useLocation();
   
   // Memoize paths to prevent unnecessary re-renders
+  // MUST be called before any conditional returns (Rules of Hooks)
   const { rootPath, normalizedRootPath, appPath } = useMemo(() => {
     const root = base ? `${base}/` : "/";
     const normalized = root.endsWith('/') ? root : `${root}/`;
@@ -25,13 +26,20 @@ function AppRouter() {
     return { rootPath: root, normalizedRootPath: normalized, appPath: app };
   }, [base]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
+  // If user is authenticated and is on the public landing, redirect to /app
+  // MUST be called before any conditional returns (Rules of Hooks)
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return; // Don't redirect if not authenticated or still loading
+    
+    const landingPaths = [rootPath, normalizedRootPath];
+    
+    // Only redirect if we're on the landing page and not already on app path
+    // Use full path comparison to avoid loops
+    const currentPath = location || '';
+    if (landingPaths.includes(currentPath) && currentPath !== appPath) {
+      setLocationLocal(appPath);
+    }
+  }, [isAuthenticated, isLoading, location, rootPath, normalizedRootPath, appPath, setLocationLocal]);
 
   // Debug: log routing info (remove in production)
   if (process.env.NODE_ENV === 'development') {
@@ -44,19 +52,14 @@ function AppRouter() {
     });
   }
 
-  // If user is authenticated and is on the public landing, redirect to /app
-  useEffect(() => {
-    if (!isAuthenticated) return; // Don't redirect if not authenticated
-    
-    const landingPaths = [rootPath, normalizedRootPath];
-    
-    // Only redirect if we're on the landing page and not already on app path
-    // Use full path comparison to avoid loops
-    const currentPath = location || '';
-    if (landingPaths.includes(currentPath) && currentPath !== appPath) {
-      setLocationLocal(appPath);
-    }
-  }, [isAuthenticated, location, rootPath, normalizedRootPath, appPath, setLocationLocal]);
+  // Early return AFTER all hooks are called
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <Switch>
