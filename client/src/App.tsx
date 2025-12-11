@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { getBasePath, stripBasePath, addBasePath, getRouteFromQuery } from "@/lib/basePath";
-import { useEffect, useState, Component, ReactNode } from "react";
+import { useEffect, useState, useRef, useMemo, Component, ReactNode } from "react";
 import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
@@ -17,9 +17,13 @@ function AppRouter() {
   const [location] = useWouterLocation();
   const [, setLocationLocal] = useLocation();
   
-  // For local development (no base path), use "/"
-  // For GitHub Pages (with base path), use the base path
-  const rootPath = base ? `${base}/` : "/";
+  // Memoize paths to prevent unnecessary re-renders
+  const { rootPath, normalizedRootPath, appPath } = useMemo(() => {
+    const root = base ? `${base}/` : "/";
+    const normalized = root.endsWith('/') ? root : `${root}/`;
+    const app = addBasePath('/app');
+    return { rootPath: root, normalizedRootPath: normalized, appPath: app };
+  }, [base]);
 
   if (isLoading) {
     return (
@@ -40,20 +44,19 @@ function AppRouter() {
     });
   }
 
-  // Normalize root path - ensure it ends with / for matching
-  const normalizedRootPath = rootPath.endsWith('/') ? rootPath : `${rootPath}/`;
-
   // If user is authenticated and is on the public landing, redirect to /app
   useEffect(() => {
     if (!isAuthenticated) return; // Don't redirect if not authenticated
     
-    const appPath = addBasePath('/app');
     const landingPaths = [rootPath, normalizedRootPath];
-    // Only redirect if we're on the landing page
-    if (landingPaths.includes(location) && location !== appPath) {
+    
+    // Only redirect if we're on the landing page and not already on app path
+    // Use full path comparison to avoid loops
+    const currentPath = location || '';
+    if (landingPaths.includes(currentPath) && currentPath !== appPath) {
       setLocationLocal(appPath);
     }
-  }, [isAuthenticated, location, rootPath, normalizedRootPath, setLocationLocal]);
+  }, [isAuthenticated, location, rootPath, normalizedRootPath, appPath, setLocationLocal]);
 
   return (
     <Switch>
@@ -66,51 +69,10 @@ function AppRouter() {
 }
 
 // Custom Router that syncs wouter's location with the base path
+// Note: Query string redirect is now handled in main.tsx before React renders
 function BasePathSync() {
-  const base = getBasePath();
-  const [location, setLocation] = useWouterLocation();
-  const [hasInitialized, setHasInitialized] = useState(false);
-  
-  // Handle initial query string redirect and path sync - run once on mount
-  useEffect(() => {
-    if (hasInitialized) return;
-    
-    // Handle GitHub Pages 404.html redirect format (?/path)
-    const routeFromQuery = getRouteFromQuery();
-    if (routeFromQuery) {
-      // Convert ?/app to /DiamondManager/app
-      const cleanRoute = routeFromQuery.startsWith('/') ? routeFromQuery : `/${routeFromQuery}`;
-      const fullPath = addBasePath(cleanRoute);
-      
-      // Update URL to clean format (remove ?/ query string)
-      window.history.replaceState(null, '', fullPath);
-      setLocation(fullPath, { replace: true } as any);
-      setHasInitialized(true);
-      return;
-    }
-    
-    // If no query string, just initialize
-    setHasInitialized(true);
-  }, [setLocation, hasInitialized]);
-  
-  // Separate effect for ongoing path syncing (only after initialization)
-  useEffect(() => {
-    if (!hasInitialized || !base) return;
-    
-    // Skip if location has query params (handled above) or if it's already correct
-    if (location && !location.includes('?') && location.startsWith(base)) {
-      const pathWithoutBase = stripBasePath(location);
-      const expectedLocation = addBasePath(pathWithoutBase);
-      
-      // Only update if location doesn't match expected format
-      // Use pathname comparison to avoid triggering on every location change
-      const currentPath = window.location.pathname;
-      if (currentPath !== expectedLocation) {
-        window.history.replaceState(null, '', expectedLocation);
-      }
-    }
-  }, [base, location, hasInitialized]);
-  
+  // This component is now minimal - just a placeholder
+  // The actual redirect happens in main.tsx to avoid React effect loops
   return null;
 }
 

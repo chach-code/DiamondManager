@@ -18,15 +18,16 @@ export function useAuth() {
   // ALWAYS check for authentication, even in guest mode
   // This ensures we detect when user logs in via OAuth
   // Use returnNull behavior so 401 (not logged in) returns null instead of throwing
-  const { data: user, isLoading, refetch } = useQuery<User | null>({
+  const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn<User | null>({ on401: "returnNull" }),
     retry: false,
     // Always enabled - we need to check auth status even if guest mode is set
     enabled: true,
-    // Refetch on mount and window focus to catch auth changes
+    // Refetch on mount to catch auth changes after OAuth redirect
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    // Don't refetch on window focus - can cause issues
+    refetchOnWindowFocus: false,
   });
 
   // If we get a user, clear guest mode
