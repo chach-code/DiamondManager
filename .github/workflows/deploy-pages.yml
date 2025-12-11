@@ -1,13 +1,11 @@
 name: Deploy to GitHub Pages
 
-# Triggers:
-# - Push to main
-# - Manual dispatch
-# - After CI workflow completes successfully
 on:
   push:
-    branches: [main]
+    branches: [ main ]
+
   workflow_dispatch:
+
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -23,7 +21,6 @@ concurrency:
 
 jobs:
   build:
-    # If this was triggered by CI, only run if CI succeeded
     if: >
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
@@ -43,26 +40,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Debug: show VITE_API_BASE_URL
-        # Print whether the variable is present and its (trimmed) value so
-        # build logs make it easy to confirm the frontend was built with the 
-        # expected backend URL. This helps diagnose the `/api/login` ->
-        # GitHub Pages 404 problem when the app was built without an API base.
+      - name: Debug VITE_API_BASE_URL
         run: |
           echo "VITE_API_BASE_URL present: ${VITE_API_BASE_URL:+true}"
           echo "VITE_API_BASE_URL (trimmed): ${VITE_API_BASE_URL}"
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://diamondmanager-backend.onrender.com' }}
 
-      # Your frontend build (existing)
       - name: Build frontend
         run: npm run build:frontend
         env:
           GITHUB_PAGES: "true"
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://diamondmanager-backend.onrender.com' }}
 
-      # Your pages build (from your CI-triggered workflow)
-      - name: Build Pages (production)
+      - name: Build Pages
         run: npm run build:pages
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://diamondmanager-backend.onrender.com' }}
