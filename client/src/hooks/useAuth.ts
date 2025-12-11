@@ -6,7 +6,13 @@ import { getQueryFn } from "@/lib/queryClient";
 export function useAuth() {
   const [isGuestMode, setIsGuestMode] = useState(() => {
     // Initialize from localStorage on mount
-    return localStorage.getItem("guestMode") === "true";
+    // Safari might throw an error if localStorage is not available (private mode, etc.)
+    try {
+      return localStorage.getItem("guestMode") === "true";
+    } catch (e) {
+      console.warn("localStorage not available, defaulting to guest mode:", e);
+      return true;
+    }
   });
 
   // Always call useQuery - just don't fetch if guest mode

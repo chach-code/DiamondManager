@@ -14,15 +14,26 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const apiUrl = getApiUrl(url);
-  const res = await fetch(apiUrl, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  
+  try {
+    const res = await fetch(apiUrl, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      // Add cache control for Safari
+      cache: "no-cache",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    // Better error handling for network failures (common on Safari)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(`Network error: Unable to connect to server. Please check your internet connection.`);
+    }
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -33,16 +44,27 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const path = queryKey.join("/") as string;
     const apiUrl = getApiUrl(path);
-    const res = await fetch(apiUrl, {
-      credentials: "include",
-    });
+    
+    try {
+      const res = await fetch(apiUrl, {
+        credentials: "include",
+        // Add cache control for Safari
+        cache: "no-cache",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      // Better error handling for network failures (common on Safari)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error(`Network error: Unable to connect to server. Please check your internet connection.`);
+      }
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

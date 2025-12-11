@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { getBasePath, stripBasePath, addBasePath } from "@/lib/basePath";
-import { useEffect } from "react";
+import { useEffect, Component, ReactNode } from "react";
 import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
@@ -94,14 +94,85 @@ function Router() {
   );
 }
 
+// Error Boundary Component
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('React Error Boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full text-center">
+            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+            <p className="text-muted-foreground mb-4">
+              The application encountered an error. Please refresh the page to try again.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+            >
+              Refresh Page
+            </button>
+            {this.state.error && process.env.NODE_ENV === 'development' && (
+              <details className="mt-4 text-left">
+                <summary className="cursor-pointer text-sm">Error Details</summary>
+                <pre className="mt-2 text-xs overflow-auto bg-muted p-2 rounded">
+                  {this.state.error.toString()}
+                </pre>
+              </details>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
+  // Catch and log any unhandled errors for debugging
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('Unhandled error:', event.error);
+    };
+    
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+    };
+    
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

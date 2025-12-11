@@ -10,7 +10,12 @@ export default function Landing() {
   const [, setLocation] = useLocation();
 
   const handleGuestMode = () => {
-    localStorage.setItem("guestMode", "true");
+    try {
+      localStorage.setItem("guestMode", "true");
+    } catch (e) {
+      console.warn("Failed to save guest mode to localStorage:", e);
+      // Continue anyway - guest mode will work for this session
+    }
     const base = getBasePath();
     setLocation(base ? `${base}/app` : "/app");
   };

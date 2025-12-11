@@ -52,6 +52,24 @@ export function getCallbackUrlFromEnv() {
   );
 }
 
+// Get the frontend URL after successful auth
+export function getFrontendRedirectUrl(): string {
+  const appOrigin = process.env.APP_ORIGIN || 'https://chach-code.github.io';
+  
+  // For production (GitHub Pages), append /DiamondManager/app
+  if (appOrigin.includes('github.io')) {
+    return `${appOrigin}/DiamondManager/app`;
+  }
+  
+  // For local dev or other environments
+  if (appOrigin.includes('localhost')) {
+    return `${appOrigin}/app`;
+  }
+  
+  // Default fallback
+  return `${appOrigin}/DiamondManager/app`;
+}
+
 // -----------------------------------------------------
 
 export function getSession() {
@@ -177,7 +195,7 @@ export async function setupAuth(app: Express) {
   app.get(
     "/api/callback",
     passport.authenticate("google", {
-      successReturnToOrRedirect: process.env.APP_ORIGIN ?? "/",
+      successReturnToOrRedirect: getFrontendRedirectUrl(),
       failureRedirect: "/api/login",
     })
   );
@@ -189,7 +207,12 @@ export async function setupAuth(app: Express) {
         return res.status(500).send("Logout failed");
       }
       req.session?.destroy(() => {
-        res.redirect(process.env.APP_ORIGIN ?? "/");
+        // Redirect to landing page on logout
+        const appOrigin = process.env.APP_ORIGIN || 'https://chach-code.github.io';
+        const redirectUrl = appOrigin.includes('github.io') 
+          ? `${appOrigin}/DiamondManager/`
+          : `${appOrigin}/`;
+        res.redirect(redirectUrl);
       });
     });
   });
