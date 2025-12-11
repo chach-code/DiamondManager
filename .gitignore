@@ -11,3 +11,6 @@ vite.config.ts.*
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Husky (keep hooks, ignore internal files)
+.husky/_/

@@ -30,3 +30,9 @@ jobs:
 
       - name: Run tests
         run: npm test --silent -- -i
+
+      - name: Build frontend (verify build works)
+        run: npm run build:frontend
+
+      - name: Build backend (verify build works)
+        run: npm run build

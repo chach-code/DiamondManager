@@ -71,6 +71,45 @@ npm start
 └── attached_assets/ # Images and assets
 ```
 
+## Development
+
+### Before Committing
+
+Always run verification before committing:
+
+```bash
+npm run verify  # Runs type checking + tests
+```
+
+Or individually:
+```bash
+npm run check   # TypeScript type checking
+npm test        # Unit tests
+```
+
+### Type Safety
+
+- **Type checking is required** - All build scripts include type checking
+- CI will fail if TypeScript errors exist
+- Use `npm run check` to verify types before pushing
+
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed development guidelines.
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run E2E tests
+npm run test:e2e
+
+# Run everything
+npm run test:all
+```
+
+See [TESTING.md](./TESTING.md) for testing documentation.
+
 ## Notes
 
 - The app works in "Guest Mode" without authentication (data stored in browser)
