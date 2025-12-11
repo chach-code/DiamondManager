@@ -45,7 +45,7 @@ jobs:
 
       - name: Debug: show VITE_API_BASE_URL
         # Print whether the variable is present and its (trimmed) value so
-        # build logs make it easy to confirm the frontend was built with the
+        # build logs make it easy to confirm the frontend was built with the 
         # expected backend URL. This helps diagnose the `/api/login` ->
         # GitHub Pages 404 problem when the app was built without an API base.
         run: |
