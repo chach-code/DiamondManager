@@ -4,8 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
-import { getBasePath, stripBasePath, addBasePath } from "@/lib/basePath";
-import { useEffect, Component, ReactNode } from "react";
+import { getBasePath, stripBasePath, addBasePath, getRouteFromQuery } from "@/lib/basePath";
+import { useEffect, useState, Component, ReactNode } from "react";
 import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
@@ -45,9 +45,12 @@ function AppRouter() {
 
   // If user is authenticated and is on the public landing, redirect to /app
   useEffect(() => {
+    if (!isAuthenticated) return; // Don't redirect if not authenticated
+    
     const appPath = addBasePath('/app');
     const landingPaths = [rootPath, normalizedRootPath];
-    if (isAuthenticated && landingPaths.includes(location)) {
+    // Only redirect if we're on the landing page
+    if (landingPaths.includes(location) && location !== appPath) {
       setLocationLocal(appPath);
     }
   }, [isAuthenticated, location, rootPath, normalizedRootPath, setLocationLocal]);
@@ -66,21 +69,47 @@ function AppRouter() {
 function BasePathSync() {
   const base = getBasePath();
   const [location, setLocation] = useWouterLocation();
+  const [hasInitialized, setHasInitialized] = useState(false);
   
+  // Handle initial query string redirect and path sync - run once on mount
   useEffect(() => {
-    // Only sync if we have a base path (GitHub Pages)
-    if (base) {
+    if (hasInitialized) return;
+    
+    // Handle GitHub Pages 404.html redirect format (?/path)
+    const routeFromQuery = getRouteFromQuery();
+    if (routeFromQuery) {
+      // Convert ?/app to /DiamondManager/app
+      const cleanRoute = routeFromQuery.startsWith('/') ? routeFromQuery : `/${routeFromQuery}`;
+      const fullPath = addBasePath(cleanRoute);
+      
+      // Update URL to clean format (remove ?/ query string)
+      window.history.replaceState(null, '', fullPath);
+      setLocation(fullPath, { replace: true } as any);
+      setHasInitialized(true);
+      return;
+    }
+    
+    // If no query string, just initialize
+    setHasInitialized(true);
+  }, [setLocation, hasInitialized]);
+  
+  // Separate effect for ongoing path syncing (only after initialization)
+  useEffect(() => {
+    if (!hasInitialized || !base) return;
+    
+    // Skip if location has query params (handled above) or if it's already correct
+    if (location && !location.includes('?') && location.startsWith(base)) {
       const pathWithoutBase = stripBasePath(location);
       const expectedLocation = addBasePath(pathWithoutBase);
       
-      if (location !== expectedLocation) {
-        // Update the browser URL without triggering navigation
+      // Only update if location doesn't match expected format
+      // Use pathname comparison to avoid triggering on every location change
+      const currentPath = window.location.pathname;
+      if (currentPath !== expectedLocation) {
         window.history.replaceState(null, '', expectedLocation);
-        // Also update wouter's internal state (pass options object)
-        setLocation(expectedLocation, { replace: true } as any);
       }
     }
-  }, [base, location, setLocation]);
+  }, [base, location, hasInitialized]);
   
   return null;
 }

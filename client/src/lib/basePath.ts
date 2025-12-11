@@ -9,8 +9,32 @@ export function getBasePath(): string {
     return '/DiamondManager';
   }
   
+  // Also check if we're at /DiamondManager (without trailing slash)
+  if (pathname === '/DiamondManager') {
+    return '/DiamondManager';
+  }
+  
   // Otherwise, no base path (local development or custom domain)
   return '';
+}
+
+// Handle GitHub Pages 404.html redirect format (?/path)
+export function getRouteFromQuery(): string | null {
+  const search = window.location.search;
+  // GitHub Pages 404.html redirect uses ?/path format
+  if (search.startsWith('?/')) {
+    // Extract the path from ?/path
+    let route = search.slice(2); // Remove '?/'
+    // Clean up any encoded characters and restore & to ~and~
+    route = route.replace(/~and~/g, '&');
+    // Remove query parameters that might have been encoded
+    const queryIndex = route.indexOf('&');
+    if (queryIndex > 0) {
+      route = route.slice(0, queryIndex);
+    }
+    return route;
+  }
+  return null;
 }
 
 export function getBasePathWithSlash(): string {
@@ -22,9 +46,11 @@ export function getBasePathWithSlash(): string {
 export function stripBasePath(pathname: string): string {
   const base = getBasePath();
   if (base && pathname.startsWith(base)) {
-    return pathname.slice(base.length) || '/';
+    const stripped = pathname.slice(base.length);
+    // Handle both /path and just path
+    return stripped.startsWith('/') ? stripped : `/${stripped}`;
   }
-  return pathname;
+  return pathname || '/';
 }
 
 // Helper to add base path to a pathname
