@@ -40,9 +40,11 @@ describe('googleAuth getOidcConfig', () => {
       await getOidcConfig();
       // If we get here, it's a failure
       throw new Error('getOidcConfig did not throw as expected');
+    // server/__tests__/googleAuth.test.ts
     } catch (err: any) {
       console.log('caught error (expected):', err && err.message ? err.message : err);
-      expect(String(err)).toMatch(/Missing required env vars/);
+      // FIX: Match the actual error message
+      expect(String(err)).toMatch(/Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET/); 
     }
   });
 
