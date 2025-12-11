@@ -96,6 +96,8 @@ export function getSession() {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         maxAge: sessionTtl,
+        // For cross-origin (GitHub Pages to Render), need sameSite: 'none'
+        sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
       },
     });
   }
@@ -114,6 +116,8 @@ export function getSession() {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
+      // For cross-origin (GitHub Pages to Render), need sameSite: 'none'
+      sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
     },
   });
 }

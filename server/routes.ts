@@ -9,14 +9,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Auth endpoint to get current user
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  // Don't use isAuthenticated middleware here - return null if not authenticated
+  // This allows the frontend to check auth status without redirecting
+  app.get("/api/auth/user", async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Check if user is authenticated
+      if (!req.isAuthenticated() || !req.user) {
+        return res.json(null);
+      }
+
+      const userId = req.user.claims?.sub;
+      if (!userId) {
+        return res.json(null);
+      }
+
       const user = await storage.getUser(userId);
       res.json(user || null);
     } catch (error) {
       console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      // Return null on error rather than 500, so frontend can handle gracefully
+      res.json(null);
     }
   });
 

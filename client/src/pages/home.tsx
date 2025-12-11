@@ -27,7 +27,7 @@ const DEMO_PLAYERS: Player[] = [
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { isGuestMode } = useAuth();
+  const { isGuestMode, user, isAuthenticated } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -101,7 +101,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {isGuestMode && (
+      {isAuthenticated && user ? (
+        <div className="bg-green-500/10 border-b border-green-500/20 px-4 py-3 flex items-center gap-3">
+          <Users className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+          <p className="text-sm text-green-800 dark:text-green-200">
+            Welcome, {user.firstName || user.email || "User"}! Your lineups will be saved.
+          </p>
+        </div>
+      ) : isGuestMode ? (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
           <p className="text-sm text-amber-800 dark:text-amber-200">
@@ -115,7 +122,7 @@ export default function Home() {
             </button>
           </p>
         </div>
-      )}
+      ) : null}
       <div className="relative h-[400px] overflow-hidden">
         <img
           src={heroImage}
