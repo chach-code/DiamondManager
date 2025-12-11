@@ -35,13 +35,13 @@ export function useAuth() {
       try {
         localStorage.removeItem("guestMode");
         setIsGuestMode(false);
-        // Refetch to ensure state is updated
-        refetch();
+        // Don't call refetch() here - React Query will automatically update
+        // and calling refetch could cause infinite loops
       } catch (e) {
         console.warn("Failed to update localStorage:", e);
       }
     }
-  }, [user, isGuestMode, refetch]);
+  }, [user, isGuestMode]); // Removed refetch from dependencies to prevent infinite loop
 
   // If user is authenticated, override guest mode
   const finalIsGuestMode = user ? false : isGuestMode;
