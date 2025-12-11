@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ export default function TeamSwitcher({ selectedTeamId, onTeamSelect }: TeamSwitc
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
   const displayName = selectedTeam?.name || "No Team Selected";
@@ -77,23 +79,37 @@ export default function TeamSwitcher({ selectedTeamId, onTeamSelect }: TeamSwitc
 
   if (isLoading) {
     return (
-      <Button variant="outline" disabled>
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        Loading...
-      </Button>
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        {!isMobile && <span className="text-sm text-green-800 dark:text-green-200 font-medium">Team:</span>}
+        <Button variant="outline" size="sm" disabled className="flex-1 sm:flex-initial">
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <span className="hidden sm:inline">Loading...</span>
+          <span className="sm:hidden">Loading</span>
+        </Button>
+      </div>
     );
   }
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="min-w-[180px] justify-between">
-            <span className="truncate">{displayName}</span>
-            <ChevronDown className="h-4 w-4 ml-2 shrink-0" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[200px]">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        {!isMobile && <span className="text-sm text-green-800 dark:text-green-200 font-medium shrink-0">Team:</span>}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px] justify-between bg-white dark:bg-gray-800 border-green-300 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 touch-manipulation"
+            >
+              <span className="truncate font-medium">{displayName}</span>
+              <ChevronDown className="h-4 w-4 ml-2 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            align={isMobile ? "start" : "end"} 
+            className="w-[calc(100vw-2rem)] sm:w-[200px] max-w-[280px]"
+            sideOffset={4}
+          >
           {teams.length === 0 ? (
             <div className="px-2 py-1.5 text-sm text-muted-foreground">
               No teams yet
@@ -106,7 +122,7 @@ export default function TeamSwitcher({ selectedTeamId, onTeamSelect }: TeamSwitc
                   setLastSelectedTeamId(team.id);
                   onTeamSelect(team.id);
                 }}
-                className="flex items-center justify-between cursor-pointer"
+                className="flex items-center justify-between cursor-pointer min-h-[44px] sm:min-h-[36px] touch-manipulation"
               >
                 <span className={team.id === selectedTeamId ? "font-semibold" : ""}>
                   {team.name}
@@ -115,7 +131,7 @@ export default function TeamSwitcher({ selectedTeamId, onTeamSelect }: TeamSwitc
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                    className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-destructive hover:text-destructive-foreground touch-manipulation"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteTeam(team.id, team.name);
@@ -123,9 +139,9 @@ export default function TeamSwitcher({ selectedTeamId, onTeamSelect }: TeamSwitc
                     disabled={deletingTeamId === team.id || isDeleting}
                   >
                     {deletingTeamId === team.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-4 w-4 sm:h-3 sm:w-3 animate-spin" />
                     ) : (
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-4 w-4 sm:h-3 sm:w-3" />
                     )}
                   </Button>
                 )}
@@ -135,13 +151,14 @@ export default function TeamSwitcher({ selectedTeamId, onTeamSelect }: TeamSwitc
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setCreateDialogOpen(true)}
-            className="cursor-pointer"
+            className="cursor-pointer min-h-[44px] sm:min-h-[36px] touch-manipulation"
           >
             <Plus className="h-4 w-4 mr-2" />
             Create New Team
           </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>

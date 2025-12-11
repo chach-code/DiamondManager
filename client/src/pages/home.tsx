@@ -176,11 +176,22 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {isAuthenticated && user ? (
-        <div className="bg-green-500/10 border-b border-green-500/20 px-4 py-3 flex items-center gap-3">
-          <Users className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-          <p className="text-sm text-green-800 dark:text-green-200">
-            Welcome, {user.firstName || user.email || "User"}! Your lineups will be saved.
-          </p>
+        <div className="bg-green-500/10 border-b border-green-500/20 px-3 sm:px-4 py-2.5 sm:py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <p className="text-xs sm:text-sm text-green-800 dark:text-green-200 truncate flex-1">
+                <span className="hidden sm:inline">Welcome, {user.firstName || user.email || "User"}! Your lineups will be saved.</span>
+                <span className="sm:hidden">Welcome, {user.firstName || user.email || "User"}!</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <TeamSwitcher 
+                selectedTeamId={selectedTeamId}
+                onTeamSelect={handleTeamSelect}
+              />
+            </div>
+          </div>
         </div>
       ) : isGuestMode ? (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 flex items-center gap-3">
@@ -213,12 +224,6 @@ export default function Home() {
           </p>
         </div>
         <div className="absolute top-4 right-4 flex gap-2 items-center">
-          {isAuthenticated && !teamsLoading && (
-            <TeamSwitcher 
-              selectedTeamId={selectedTeamId}
-              onTeamSelect={handleTeamSelect}
-            />
-          )}
           <ThemeToggle />
           <Button
             variant="outline"
