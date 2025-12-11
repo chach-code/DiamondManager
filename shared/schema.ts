@@ -68,16 +68,19 @@ export type UpsertUser = {
 };
 
 // Team types
-export const insertTeamSchema = createInsertSchema(teams).omit({ id: true, createdAt: true, updatedAt: true });
+// Note: userId is omitted because it's added server-side from the authenticated user
+export const insertTeamSchema = createInsertSchema(teams).omit({ id: true, userId: true, createdAt: true, updatedAt: true });
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type Team = typeof teams.$inferSelect;
 
 // Player types
-export const insertPlayerSchema = createInsertSchema(players).omit({ id: true, createdAt: true, updatedAt: true });
+// Note: teamId is omitted because it's provided via the route parameter
+export const insertPlayerSchema = createInsertSchema(players).omit({ id: true, teamId: true, createdAt: true, updatedAt: true });
 export type InsertPlayer = z.infer<typeof insertPlayerSchema>;
 export type Player = typeof players.$inferSelect;
 
 // Lineup types
-export const insertLineupSchema = createInsertSchema(lineups).omit({ id: true, createdAt: true, updatedAt: true });
+// Note: teamId is omitted because it's provided via the route parameter
+export const insertLineupSchema = createInsertSchema(lineups).omit({ id: true, teamId: true, createdAt: true, updatedAt: true });
 export type InsertLineup = z.infer<typeof insertLineupSchema>;
 export type Lineup = typeof lineups.$inferSelect;

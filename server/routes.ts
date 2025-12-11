@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
-import { insertTeamSchema, insertPlayerSchema, insertLineupSchema } from "@shared/schema";
+import { insertTeamSchema, insertPlayerSchema, insertLineupSchema, type InsertTeam, type InsertPlayer, type InsertLineup } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const team = await storage.createTeam({
         ...parsed.data,
         userId,
-      });
+      } as InsertTeam & { userId: string });
       res.status(201).json(team);
     } catch (error) {
       console.error("Error creating team:", error);
@@ -109,7 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const player = await storage.createPlayer({
         ...parsed.data,
         teamId: req.params.teamId,
-      });
+      } as InsertPlayer & { teamId: string });
       res.status(201).json(player);
     } catch (error) {
       console.error("Error creating player:", error);
@@ -163,7 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lineup = await storage.createLineup({
         ...parsed.data,
         teamId: req.params.teamId,
-      });
+      } as InsertLineup & { teamId: string });
       res.status(201).json(lineup);
     } catch (error) {
       console.error("Error creating lineup:", error);
