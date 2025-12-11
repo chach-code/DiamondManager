@@ -10,43 +10,95 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import memorystore from "memorystore";
+import { createRequire } from "node:module";
 
-// We will rely on runtime structure and use `typeof` and ReturnType for typing
-// No external type imports from "openid-client" are necessary now.
+// Create require function for CommonJS module loading in ESM
+const require = createRequire(import.meta.url);
 
 // -----------------------------------------------------
 
 export const getOidcConfig = memoize(
   async () => {
-    const openid = await import("openid-client") as any;
+    // Use createRequire to import CommonJS module - more reliable in bundled ESM
+    // This works because openid-client is marked as external, so it's available at runtime
+    let openid: any;
+    try {
+      // Try ESM dynamic import first (works in development/unbundled)
+      const esmImport = await import("openid-client");
+      // Check if it has the expected structure
+      if (esmImport.Issuer || (esmImport.default && esmImport.default.Issuer)) {
+        openid = esmImport;
+      } else {
+        throw new Error("ESM import structure unexpected");
+      }
+    } catch {
+      // Fallback to CommonJS require (works better in bundled production)
+      openid = require("openid-client");
+    }
     
-    // --- START ISSUER EXTRACTION (Maximum Robustness) ---
+    // --- START ISSUER EXTRACTION (Final, Simplified, and Robust Logic) ---
     
     let moduleExports: any = openid;
 
-    // 1. Check for the common 'default' nesting first
-    if (moduleExports && typeof moduleExports === 'object' && 'default' in moduleExports) {
-        // If 'default' exists, it is likely the actual exports object
+    // Check for the common 'default' nesting first (Bundler/ESM convention)
+    if (moduleExports && typeof moduleExports === 'object' && moduleExports.default) {
         moduleExports = moduleExports.default;
     }
+    
+    // Also check for CommonJS default export
+    if (moduleExports && typeof moduleExports === 'object' && moduleExports.__esModule && moduleExports.default) {
+        // If it's an ESM wrapper around CJS, check the default
+        if (moduleExports.default.Issuer) {
+          moduleExports = moduleExports.default;
+        }
+    }
+    
+    // The core of the issue:
+    // When a bundler wraps a CommonJS library, the named exports (like Issuer) 
+    // often end up either on the top level object, or on the object nested under 
+    // 'default'. We already checked that.
+    //
+    // The safest way to access CJS exports after a dynamic import is often 
+    // to check the root object's named property, or rely on the final object 
+    // being the one that holds the exports.
+    
+    // Prioritize the property named 'Issuer' from the final resolved exports object
+    let Issuer: any = moduleExports.Issuer; 
 
-    // 2. The variable that holds the Issuer class
-    let Issuer: any;
-
-    // Try common locations sequentially:
-    if (moduleExports?.Issuer) {
-        Issuer = moduleExports.Issuer; // Location A: module.exports.Issuer (most common)
-    } else if (openid?.Issuer) {
-        Issuer = openid.Issuer;       // Location B: The original import object has it (fallback)
-    } else if (moduleExports?.default?.Issuer) {
-        Issuer = moduleExports.default.Issuer; // Location C: Deeper nesting (rare)
-    } else {
-        // Ultimate failure: log structure for debugging
-        console.error("Failed to find Issuer class in openid-client. Module structure:", Object.keys(openid));
-        throw new Error("Could not find Issuer export in openid-client module structure.");
+    // If still missing, check the original imported object, as sometimes 
+    // the property is defined but not enumerable and gets missed in the default check.
+    if (!Issuer && openid.Issuer) {
+        Issuer = openid.Issuer;
+    }
+    
+    // Additional fallback: check all possible paths
+    if (!Issuer && typeof openid === 'object') {
+      // Try accessing directly - handle both ESM and CommonJS formats
+      const openidAny = openid as any;
+      Issuer = openidAny?.Issuer || openidAny?.default?.Issuer || openidAny?.default?.default?.Issuer;
+      
+      // Last resort: check if it's a namespace import
+      if (!Issuer && 'default' in openidAny) {
+        const defaultExport = openidAny.default;
+        if (defaultExport && typeof defaultExport === 'object') {
+          Issuer = defaultExport.Issuer || (defaultExport.default && defaultExport.default.Issuer);
+        }
+      }
     }
 
-    // Assert type for TS compilation (same as before)
+    if (typeof Issuer !== 'function') {
+      // Re-throw the error with diagnostic info on the structure
+      console.error("Failed to find Issuer class. Keys on final moduleExports:", Object.keys(moduleExports || {}));
+      console.error("Keys on original imported object:", Object.keys(openid || {}));
+      console.error("Type of openid:", typeof openid);
+      console.error("Has default property:", 'default' in (openid || {}));
+      if (typeof openid === 'object' && openid !== null) {
+        console.error("Sample of openid structure:", JSON.stringify(Object.keys(openid).slice(0, 10)));
+      }
+      throw new Error("Could not find Issuer class in openid-client module structure.");
+    }
+    
+    // Assert type for TS compilation
     const FinalIssuer: typeof Issuer = Issuer;
     
     // --- END ISSUER EXTRACTION ---
@@ -60,7 +112,7 @@ export const getOidcConfig = memoize(
 
     const redirect = getCallbackUrlFromEnv();
 
-    // ⚠️ Use FinalIssuer here ⚠️
+    // Use the correctly extracted Issuer class
     const google = await FinalIssuer.discover("https://accounts.google.com");
 
     const client = new google.Client({
@@ -180,9 +232,16 @@ export async function setupAuth(app: Express) {
   };
 
   // Import PassportStrategy from openid-client/passport
-  const passportMod: any = await import("openid-client/passport");
-  // Use a fallback for Strategy extraction
-  const Strategy = passportMod.Strategy || passportMod.default?.Strategy; 
+  let passportMod: any;
+  try {
+    const esmImport = await import("openid-client/passport");
+    passportMod = esmImport;
+  } catch {
+    // Fallback to CommonJS require
+    passportMod = require("openid-client/passport");
+  }
+  // Use a fallback for Strategy extraction - handle various module formats
+  const Strategy = passportMod.Strategy || passportMod.default?.Strategy || passportMod?.default?.default?.Strategy; 
 
   // Stable working strategy config
   passport.use(
@@ -253,10 +312,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   try {
-    // ⚠️ FIX: Define the type of the Client dynamically based on getOidcConfig's return type
+    // Define the type of the Client dynamically based on getOidcConfig's return type
     type OpenIdClientType = ReturnType<typeof getOidcConfig> extends Promise<infer U> ? U : never;
 
-    // Assert the client has the correct type, allowing access to .refresh()
     const client = (await getOidcConfig()) as OpenIdClientType; 
     
     const refreshed = await client.refresh(refreshToken);
