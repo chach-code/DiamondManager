@@ -11,19 +11,30 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import memorystore from "memorystore";
 
+// We will rely on runtime structure and use `typeof` and ReturnType for typing
+// No external type imports from "openid-client" are necessary now.
+
+// -----------------------------------------------------
+
 export const getOidcConfig = memoize(
   async () => {
-    // Dynamically import the openid-client module
-    const openid = await import("openid-client");
+    // 1. Dynamic import. Use 'as any' to bypass TS strict checking on the import result.
+    const openid = await import("openid-client") as any;
+    
+    // --- START ISSUER EXTRACTION (Robust logic for bundled/mixed modules) ---
+    
+    let moduleExports: any = openid;
 
-    // The 'Issuer' class might be on the root object or under 'default'.
-    // We try to access the named export 'Issuer' using a type assertion
-    // to satisfy TypeScript, as the dynamic import result's type definition 
-    // might be incomplete for named exports.
-    const { Issuer } = (openid as any).Issuer 
-      ? (openid as any) // If Issuer is on the root object
-      : (openid as any).default; // If Issuer is under the default export
-
+    // Fallback check for modules bundled under 'default'
+    if (moduleExports && typeof moduleExports === 'object' && 'default' in moduleExports) {
+        moduleExports = moduleExports.default;
+    }
+    
+    // 2. Use a type assertion to define the type of the Issuer variable
+    const Issuer: typeof moduleExports.Issuer = moduleExports.Issuer;
+    
+    // --- END ISSUER EXTRACTION ---
+    
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -31,16 +42,12 @@ export const getOidcConfig = memoize(
       throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
     }
 
-    const redirect =
-      process.env.GOOGLE_CALLBACK_URL ??
-      `${process.env.BACKEND_ORIGIN ??
-        process.env.APP_ORIGIN ??
-        `http://localhost:${process.env.PORT ?? 5000}`
-      }/api/callback`;
+    const redirect = getCallbackUrlFromEnv();
 
     // Always use stable Issuer.discover
     const google = await Issuer.discover("https://accounts.google.com");
 
+    // The return value is a Client instance.
     const client = new google.Client({
       client_id: clientId,
       client_secret: clientSecret,
@@ -159,7 +166,8 @@ export async function setupAuth(app: Express) {
 
   // Import PassportStrategy from openid-client/passport
   const passportMod: any = await import("openid-client/passport");
-  const Strategy = passportMod.Strategy;
+  // Use a fallback for Strategy extraction
+  const Strategy = passportMod.Strategy || passportMod.default?.Strategy; 
 
   // Stable working strategy config
   passport.use(
@@ -199,7 +207,11 @@ export async function setupAuth(app: Express) {
   );
 
   app.get("/api/logout", (req, res) => {
-    req.logout(() => {
+    req.logout((err) => {
+      if (err) { 
+        console.error("Logout failed:", err);
+        return res.status(500).send("Logout failed");
+      }
       req.session?.destroy(() => {
         res.redirect(process.env.APP_ORIGIN ?? "/");
       });
@@ -226,7 +238,12 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   try {
-    const client = await getOidcConfig();
+    // ⚠️ FIX: Define the type of the Client dynamically based on getOidcConfig's return type
+    type OpenIdClientType = ReturnType<typeof getOidcConfig> extends Promise<infer U> ? U : never;
+
+    // Assert the client has the correct type, allowing access to .refresh()
+    const client = (await getOidcConfig()) as OpenIdClientType; 
+    
     const refreshed = await client.refresh(refreshToken);
 
     user.claims = refreshed.claims();
