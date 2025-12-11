@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import * as React from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,34 +13,55 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
-import type { Player } from "./PlayerCard";
+import type { Player } from "@shared/schema";
 
 interface PlayerFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   player?: Player | null;
-  onSave: (player: Omit<Player, 'id'> & { id?: string }) => void;
+  onSave: (player: Omit<Player, 'id'> & { id?: string }) => Promise<void>;
 }
 
 const AVAILABLE_POSITIONS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
 
 export default function PlayerFormDialog({ open, onOpenChange, player, onSave }: PlayerFormDialogProps) {
-  const [name, setName] = useState(player?.name || "");
-  const [number, setNumber] = useState(player?.number?.toString() || "");
-  const [selectedPositions, setSelectedPositions] = useState<string[]>(player?.positions || []);
+  const [name, setName] = useState("");
+  const [number, setNumber] = useState("");
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Update form when player prop or dialog open state changes
+  React.useEffect(() => {
+    if (open) {
+      if (player) {
+        setName(player.name || "");
+        setNumber(player.number?.toString() || "");
+        setSelectedPositions(player.positions || []);
+      } else {
+        setName("");
+        setNumber("");
+        setSelectedPositions([]);
+      }
+    }
+  }, [player, open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...(player?.id && { id: player.id }),
-      name,
-      number: parseInt(number),
-      positions: selectedPositions,
-    });
-    onOpenChange(false);
-    setName("");
-    setNumber("");
-    setSelectedPositions([]);
+    try {
+      await onSave({
+        ...(player?.id && { id: player.id }),
+        name,
+        number: parseInt(number) || 0,
+        positions: selectedPositions,
+      } as any);
+      // Reset form and close dialog on success
+      setName("");
+      setNumber("");
+      setSelectedPositions([]);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to save player:", error);
+      // Keep dialog open on error so user can retry
+    }
   };
 
   const togglePosition = (position: string) => {
@@ -112,7 +134,12 @@ export default function PlayerFormDialog({ open, onOpenChange, player, onSave }:
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                onOpenChange(false);
+                setName("");
+                setNumber("");
+                setSelectedPositions([]);
+              }}
               data-testid="button-cancel"
             >
               Cancel

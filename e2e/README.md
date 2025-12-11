@@ -9,12 +9,13 @@ This directory contains end-to-end tests for the DiamondManager application usin
    npm run playwright:install
    ```
 
-2. The tests are configured to run against production by default:
-   - Production: `https://chach-code.github.io/DiamondManager/`
+2. The tests are configured to run against localhost by default:
+   - Local: `http://localhost:5173` (Vite dev server)
+   - The Playwright config will automatically start the dev server if it's not running
 
-3. To test against localhost, set the environment variable:
+3. To test against production, set the environment variable:
    ```bash
-   PLAYWRIGHT_BASE_URL=http://localhost:5000 npm run test:e2e
+   PLAYWRIGHT_BASE_URL=https://chach-code.github.io npm run test:e2e
    ```
 
 ## Running Tests

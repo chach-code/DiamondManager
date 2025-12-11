@@ -24,7 +24,8 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://chach-code.github.io',
+    /* Default to localhost for local development, override with PLAYWRIGHT_BASE_URL env var */
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     /* Screenshot on failure */
@@ -54,9 +55,15 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:5000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  /* Only start server if PLAYWRIGHT_BASE_URL is not explicitly set (for local testing) */
+  webServer: process.env.PLAYWRIGHT_BASE_URL && !process.env.PLAYWRIGHT_BASE_URL.includes('localhost') 
+    ? undefined 
+    : {
+        command: 'npx vite --port 5173 --host',
+        url: 'http://localhost:5173',
+        reuseExistingServer: true, // Always reuse if server is already running
+        timeout: 120 * 1000, // 2 minutes to start
+        stdout: 'ignore',
+        stderr: 'pipe',
+      },
 });

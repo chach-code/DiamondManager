@@ -2,13 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2 } from "lucide-react";
-
-export interface Player {
-  id: string;
-  name: string;
-  number: number;
-  positions: string[];
-}
+import type { Player } from "@shared/schema";
 
 interface PlayerCardProps {
   player: Player;
@@ -22,7 +16,7 @@ export default function PlayerCard({ player, onEdit, onDelete }: PlayerCardProps
       <div className="flex items-center gap-4">
         <div className="flex-shrink-0 w-16 h-16 rounded-full bg-primary flex items-center justify-center">
           <span className="text-3xl font-bold text-primary-foreground" data-testid={`text-jersey-${player.id}`}>
-            {player.number}
+            {parseInt(player.number)}
           </span>
         </div>
         
