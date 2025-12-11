@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shuffle } from "lucide-react";
-import type { Player } from "./PlayerCard";
+import type { Player } from "@shared/schema";
 
 interface BattingLineupProps {
   players: Player[];

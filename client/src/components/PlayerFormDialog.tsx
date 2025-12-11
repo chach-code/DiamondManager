@@ -19,7 +19,7 @@ interface PlayerFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   player?: Player | null;
-  onSave: (player: Omit<Player, 'id'> & { id?: string }) => Promise<void>;
+  onSave: (player: Omit<Player, 'id' | 'teamId' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<void>;
 }
 
 const AVAILABLE_POSITIONS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
@@ -50,9 +50,9 @@ export default function PlayerFormDialog({ open, onOpenChange, player, onSave }:
       await onSave({
         ...(player?.id && { id: player.id }),
         name,
-        number: parseInt(number) || 0,
+        number: number || '0', // Store as string to match schema
         positions: selectedPositions,
-      } as any);
+      });
       // Reset form and close dialog on success
       setName("");
       setNumber("");

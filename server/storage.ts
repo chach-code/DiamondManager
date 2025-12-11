@@ -22,19 +22,19 @@ export interface IStorage {
 
   // Team operations
   getUserTeams(userId: string): Promise<Team[]>;
-  createTeam(team: InsertTeam): Promise<Team>;
+  createTeam(team: InsertTeam & { userId: string }): Promise<Team>;
   deleteTeam(teamId: string): Promise<void>;
   updateTeam(teamId: string, data: Partial<InsertTeam>): Promise<Team>;
 
   // Player operations
   getTeamPlayers(teamId: string): Promise<Player[]>;
-  createPlayer(player: InsertPlayer): Promise<Player>;
+  createPlayer(player: InsertPlayer & { teamId: string }): Promise<Player>;
   updatePlayer(playerId: string, data: Partial<InsertPlayer>): Promise<Player>;
   deletePlayer(playerId: string): Promise<void>;
 
   // Lineup operations
   getTeamLineups(teamId: string): Promise<Lineup[]>;
-  createLineup(lineup: InsertLineup): Promise<Lineup>;
+  createLineup(lineup: InsertLineup & { teamId: string }): Promise<Lineup>;
   updateLineup(lineupId: string, data: Partial<InsertLineup>): Promise<Lineup>;
   deleteLineup(lineupId: string): Promise<void>;
 }
@@ -69,7 +69,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(teams).where(eq(teams.userId, userId));
   }
 
-  async createTeam(team: InsertTeam): Promise<Team> {
+  async createTeam(team: InsertTeam & { userId: string }): Promise<Team> {
     const [newTeam] = await db.insert(teams).values(team).returning();
     return newTeam;
   }
@@ -92,7 +92,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(players).where(eq(players.teamId, teamId));
   }
 
-  async createPlayer(player: InsertPlayer): Promise<Player> {
+  async createPlayer(player: InsertPlayer & { teamId: string }): Promise<Player> {
     const [newPlayer] = await db.insert(players).values(player).returning();
     return newPlayer;
   }
@@ -115,7 +115,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(lineups).where(eq(lineups.teamId, teamId));
   }
 
-  async createLineup(lineup: InsertLineup): Promise<Lineup> {
+  async createLineup(lineup: InsertLineup & { teamId: string }): Promise<Lineup> {
     const [newLineup] = await db.insert(lineups).values(lineup).returning();
     return newLineup;
   }

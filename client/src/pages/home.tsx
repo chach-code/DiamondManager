@@ -17,16 +17,18 @@ import { useTeamPlayers } from "@/hooks/useTeamPlayers";
 import { getApiNavUrl } from "@/lib/apiConfig";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 
-const DEMO_PLAYERS: Player[] = [
-  { id: 'demo-1', name: 'Mike Rodriguez', number: 24, positions: ['SS', '2B'] },
-  { id: 'demo-2', name: 'Jake Thompson', number: 7, positions: ['P'] },
-  { id: 'demo-3', name: 'Chris Martinez', number: 15, positions: ['C'] },
-  { id: 'demo-4', name: 'Ryan Davis', number: 32, positions: ['1B', '3B'] },
-  { id: 'demo-5', name: 'Tyler Johnson', number: 11, positions: ['LF', 'CF', 'RF'] },
-  { id: 'demo-6', name: 'Alex Smith', number: 9, positions: ['2B', 'SS'] },
-  { id: 'demo-7', name: 'Jordan Lee', number: 18, positions: ['LF', 'CF'] },
-  { id: 'demo-8', name: 'Kevin Brown', number: 5, positions: ['3B', 'SS'] },
-  { id: 'demo-9', name: 'Sam Wilson', number: 21, positions: ['RF', 'CF'] },
+// Demo players for guest mode (not used when authenticated)
+// Note: These are not full Player objects - just for display purposes
+const DEMO_PLAYERS: Array<Omit<Player, 'teamId' | 'createdAt' | 'updatedAt'>> = [
+  { id: 'demo-1', name: 'Mike Rodriguez', number: '24', positions: ['SS', '2B'] },
+  { id: 'demo-2', name: 'Jake Thompson', number: '7', positions: ['P'] },
+  { id: 'demo-3', name: 'Chris Martinez', number: '15', positions: ['C'] },
+  { id: 'demo-4', name: 'Ryan Davis', number: '32', positions: ['1B', '3B'] },
+  { id: 'demo-5', name: 'Tyler Johnson', number: '11', positions: ['LF', 'CF', 'RF'] },
+  { id: 'demo-6', name: 'Alex Smith', number: '9', positions: ['2B', 'SS'] },
+  { id: 'demo-7', name: 'Jordan Lee', number: '18', positions: ['LF', 'CF'] },
+  { id: 'demo-8', name: 'Kevin Brown', number: '5', positions: ['3B', 'SS'] },
+  { id: 'demo-9', name: 'Sam Wilson', number: '21', positions: ['RF', 'CF'] },
 ];
 
 export default function Home() {
@@ -86,19 +88,19 @@ export default function Home() {
     }
   };
 
-  const handleSavePlayer = async (playerData: Omit<Player, 'id' | 'teamId' | 'createdAt' | 'updatedAt'> & { id?: string; number: number }) => {
+  const handleSavePlayer = async (playerData: Omit<Player, 'id' | 'teamId' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     if (!selectedTeamId) {
       console.error("No team selected");
       throw new Error("No team selected");
     }
 
     if (playerData.id) {
-      // Update existing player - need to convert number back to string for API
+      // Update existing player
       await updatePlayer({
         playerId: playerData.id,
         playerData: {
           name: playerData.name,
-          number: playerData.number.toString(),
+          number: playerData.number, // Already a string from schema
           positions: playerData.positions,
         },
       });
@@ -108,7 +110,7 @@ export default function Home() {
         teamId: selectedTeamId,
         playerData: {
           name: playerData.name,
-          number: playerData.number.toString(),
+          number: playerData.number, // Already a string from schema
           positions: playerData.positions,
         },
       });

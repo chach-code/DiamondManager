@@ -11,7 +11,9 @@ export default function PlayerFormDialogExample() {
       <PlayerFormDialog
         open={open}
         onOpenChange={setOpen}
-        onSave={(player) => console.log('Saved player:', player)}
+        onSave={async (player) => {
+          console.log('Saved player:', player);
+        }}
       />
     </div>
   );
