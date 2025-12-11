@@ -18,20 +18,36 @@ import memorystore from "memorystore";
 
 export const getOidcConfig = memoize(
   async () => {
-    // 1. Dynamic import. Use 'as any' to bypass TS strict checking on the import result.
     const openid = await import("openid-client") as any;
     
-    // --- START ISSUER EXTRACTION (Robust logic for bundled/mixed modules) ---
+    // --- START ISSUER EXTRACTION (Maximum Robustness) ---
     
     let moduleExports: any = openid;
 
-    // Fallback check for modules bundled under 'default'
+    // 1. Check for the common 'default' nesting first
     if (moduleExports && typeof moduleExports === 'object' && 'default' in moduleExports) {
+        // If 'default' exists, it is likely the actual exports object
         moduleExports = moduleExports.default;
     }
-    
-    // 2. Use a type assertion to define the type of the Issuer variable
-    const Issuer: typeof moduleExports.Issuer = moduleExports.Issuer;
+
+    // 2. The variable that holds the Issuer class
+    let Issuer: any;
+
+    // Try common locations sequentially:
+    if (moduleExports?.Issuer) {
+        Issuer = moduleExports.Issuer; // Location A: module.exports.Issuer (most common)
+    } else if (openid?.Issuer) {
+        Issuer = openid.Issuer;       // Location B: The original import object has it (fallback)
+    } else if (moduleExports?.default?.Issuer) {
+        Issuer = moduleExports.default.Issuer; // Location C: Deeper nesting (rare)
+    } else {
+        // Ultimate failure: log structure for debugging
+        console.error("Failed to find Issuer class in openid-client. Module structure:", Object.keys(openid));
+        throw new Error("Could not find Issuer export in openid-client module structure.");
+    }
+
+    // Assert type for TS compilation (same as before)
+    const FinalIssuer: typeof Issuer = Issuer;
     
     // --- END ISSUER EXTRACTION ---
     
@@ -44,10 +60,9 @@ export const getOidcConfig = memoize(
 
     const redirect = getCallbackUrlFromEnv();
 
-    // Always use stable Issuer.discover
-    const google = await Issuer.discover("https://accounts.google.com");
+    // ⚠️ Use FinalIssuer here ⚠️
+    const google = await FinalIssuer.discover("https://accounts.google.com");
 
-    // The return value is a Client instance.
     const client = new google.Client({
       client_id: clientId,
       client_secret: clientSecret,
