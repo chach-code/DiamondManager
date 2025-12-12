@@ -89,27 +89,45 @@ export function useAuth() {
       } : null);
       return userData;
     } catch (error) {
+      // CRITICAL: Handle CORS errors and network failures gracefully
+      // Don't throw - return null to prevent infinite retry loops
+      if (error instanceof TypeError && (
+        error.message.includes('fetch') || 
+        error.message.includes('CORS') ||
+        error.message.includes('Failed to fetch')
+      )) {
+        console.warn("⚠️ [useAuth] Network/CORS error - returning null to prevent loop:", error.message);
+        return null; // Return null instead of throwing to prevent React Query from retrying
+      }
+      
       console.error("❌ [useAuth] Auth check error:", error);
       if (error instanceof Error && error.message.includes('401')) {
         return null;
       }
-      throw error;
+      // For other errors, still return null to prevent loops
+      console.warn("⚠️ [useAuth] Unexpected error - returning null to prevent loop");
+      return null;
     }
   };
 
+  // CRITICAL: Don't check auth if in guest mode initially
+  // This prevents infinite loops when guest mode is set
+  // We'll enable it once guest mode is cleared or after a delay
+  const shouldCheckAuth = !isGuestMode;
+  
   const { data: user, isLoading, refetch } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: authQueryFn,
     retry: false,
-    // Always enabled - we need to check auth status even if guest mode is set
-    enabled: true,
+    // Only enable auth check if not in guest mode
+    // This prevents infinite loops when CORS fails or network errors occur
+    enabled: shouldCheckAuth,
     // Refetch on mount to catch auth changes after OAuth redirect
-    refetchOnMount: true,
+    refetchOnMount: shouldCheckAuth,
     // Don't refetch on window focus - can cause issues
     refetchOnWindowFocus: false,
-    // Use a small staleTime to allow caching but still detect auth changes
-    // Setting to 0 causes infinite loops, so use 5 seconds as a balance
-    staleTime: 5000, // Consider stale after 5 seconds (allows some caching)
+    // Use longer staleTime to prevent constant refetching
+    staleTime: 30000, // Consider stale after 30 seconds (reduces refetch frequency)
     gcTime: 60000, // Cache in memory for 1 minute
   });
 
@@ -118,8 +136,11 @@ export function useAuth() {
   const oauthRedirectHandledRef = useRef(false);
   const refetchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // CRITICAL: Only run OAuth redirect logic if auth checking is enabled
+  // Don't run in guest mode or if auth is disabled
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!shouldCheckAuth) return; // Skip if auth checking is disabled (guest mode)
     
     // Check if we're on /app path (likely after OAuth redirect)
     const pathname = window.location.pathname;
@@ -134,18 +155,6 @@ export function useAuth() {
     const hasOAuthFlag = oauthRedirectFlag !== null;
     
     const isOAuthRedirect = oauthCallback || hasOAuthFlag;
-    
-    // Log for debugging
-    console.log("🔍 OAuth redirect detection:", {
-      pathname,
-      isAppPath,
-      oauthCallback,
-      hasOAuthFlag,
-      isLoading,
-      alreadyHandled: oauthRedirectHandledRef.current,
-      hasCookies: document.cookie.length > 0,
-      cookieCount: document.cookie.split(';').length,
-    });
     
     // Only handle OAuth redirect once, and only when not loading
     if (isAppPath && !isLoading && isOAuthRedirect && !oauthRedirectHandledRef.current) {
@@ -194,7 +203,7 @@ export function useAuth() {
     if (!isAppPath) {
       oauthRedirectHandledRef.current = false;
     }
-  }, [isLoading, refetch]); // Only run when loading state changes
+  }, [isLoading, refetch, shouldCheckAuth]); // Only run when loading state changes or auth check enabled state changes
 
   // If we get a user, clear guest mode
   useEffect(() => {
@@ -206,6 +215,14 @@ export function useAuth() {
       // and calling refetch could cause infinite loops
     }
   }, [user, isGuestMode, setIsGuestMode]);
+
+  // If guest mode is set, ensure auth check is disabled to prevent loops
+  // This ensures that once guest mode is set, we don't keep checking auth
+  useEffect(() => {
+    if (isGuestMode && shouldCheckAuth) {
+      console.log("⚠️ [useAuth] Guest mode active - auth checking should be disabled");
+    }
+  }, [isGuestMode, shouldCheckAuth]);
 
   // If user is authenticated, override guest mode
   const finalIsGuestMode = user ? false : isGuestMode;
