@@ -32,7 +32,7 @@ module.exports = {
     {
       displayName: 'client',
       testEnvironment: 'jsdom',
-      testMatch: ['<rootDir>/client/__tests__/**/*.test.tsx', '<rootDir>/client/__tests__/**/*.test.ts'],
+      testMatch: ['<rootDir>/client/__tests__/**/*.test.tsx'],
       setupFilesAfterEnv: ['<rootDir>/client/__tests__/setup.ts'],
       transform: {
         '^.+\\.tsx?$': ['ts-jest', {
@@ -44,6 +44,21 @@ module.exports = {
         '^@/(.*)$': '<rootDir>/client/src/$1'
       },
       extensionsToTreatAsEsm: ['.ts', '.tsx'],
+    },
+    {
+      displayName: 'client-node',
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/client/__tests__/**/*.test.ts'],
+      transform: {
+        '^.+\\.tsx?$': ['ts-jest', {
+          useESM: true
+        }]
+      },
+      moduleNameMapper: {
+        '^@shared/(.*)$': '<rootDir>/shared/$1',
+        '^@/(.*)$': '<rootDir>/client/src/$1'
+      },
+      extensionsToTreatAsEsm: ['.ts'],
     },
   ],
 };

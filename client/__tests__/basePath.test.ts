@@ -1,14 +1,18 @@
 import { getBasePath, getBasePathWithSlash, stripBasePath, addBasePath } from '../src/lib/basePath';
 
-describe('basePath utilities', () => {
-  const originalWindow = (global as any).window;
+// Mock window for node environment
+(global as any).window = {
+  location: { pathname: '/' }
+};
 
-  afterEach(() => {
-    (global as any).window = originalWindow;
+describe('basePath utilities', () => {
+  beforeEach(() => {
+    // Reset to default
+    (global as any).window.location.pathname = '/';
   });
 
   test('detects DiamondManager base path', () => {
-    (global as any).window = { location: { pathname: '/DiamondManager/foo' } };
+    (global as any).window.location.pathname = '/DiamondManager/foo';
     expect(getBasePath()).toBe('/DiamondManager');
     expect(getBasePathWithSlash()).toBe('/DiamondManager/');
     expect(stripBasePath('/DiamondManager/foo')).toBe('/foo');
@@ -16,7 +20,7 @@ describe('basePath utilities', () => {
   });
 
   test('returns empty base path for root', () => {
-    (global as any).window = { location: { pathname: '/' } };
+    (global as any).window.location.pathname = '/';
     expect(getBasePath()).toBe('');
     expect(getBasePathWithSlash()).toBe('/');
     expect(stripBasePath('/foo')).toBe('/foo');
