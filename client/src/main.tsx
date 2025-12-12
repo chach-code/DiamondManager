@@ -80,22 +80,29 @@ if (typeof window !== 'undefined') {
         localStorage.setItem(testKey, 'test');
         localStorage.removeItem(testKey);
         
-        // Store the token
-        localStorage.setItem('auth_token', token);
-        
-        // Verify it was stored
-        const stored = localStorage.getItem('auth_token');
-        if (stored === token) {
-          console.log("🔑 [main.tsx] JWT token extracted and stored from URL hash", {
-            tokenPreview: token.substring(0, 30) + '...',
-            tokenLength: token.length,
-            stored: true,
-          });
+          // Validate token structure (JWT should have 3 parts separated by dots)
+        const tokenParts = token.split('.');
+        if (tokenParts.length !== 3) {
+          console.error("❌ [main.tsx] Invalid JWT token structure - expected 3 parts, got", tokenParts.length);
         } else {
-          console.error("❌ [main.tsx] Token storage failed - stored value doesn't match", {
-            expectedLength: token.length,
-            storedLength: stored?.length || 0,
-          });
+          // Store the token
+          localStorage.setItem('auth_token', token);
+          
+          // Verify it was stored
+          const stored = localStorage.getItem('auth_token');
+          if (stored === token) {
+            console.log("🔑 [main.tsx] JWT token extracted and stored from URL hash", {
+              tokenPreview: token.substring(0, 30) + '...',
+              tokenLength: token.length,
+              tokenParts: tokenParts.length,
+              stored: true,
+            });
+          } else {
+            console.error("❌ [main.tsx] Token storage failed - stored value doesn't match", {
+              expectedLength: token.length,
+              storedLength: stored?.length || 0,
+            });
+          }
         }
       } catch (e) {
         console.error("❌ [main.tsx] Failed to store JWT token:", e);
@@ -157,12 +164,22 @@ if (typeof window !== 'undefined') {
         const tokenMatch = part.match(/auth_token=(.+)$/);
         if (tokenMatch && tokenMatch[1]) {
           try {
-            const token = decodeURIComponent(tokenMatch[1].replace(/~and~/g, '&')); // Handle ~and~ encoding
-            localStorage.setItem('auth_token', token);
-            console.log("🔑 [main.tsx] JWT token extracted from transformed query parameter");
-            tokenFromTransformedQuery = true;
-            // Don't include auth_token in final URL (remove from query string)
-            continue;
+            let token = decodeURIComponent(tokenMatch[1].replace(/~and~/g, '&')); // Handle ~and~ encoding
+            
+            // Validate token structure (JWT should have 3 parts separated by dots)
+            const tokenParts = token.split('.');
+            if (tokenParts.length !== 3) {
+              console.error("❌ [main.tsx] Invalid JWT token structure from query param - expected 3 parts, got", tokenParts.length);
+            } else {
+              localStorage.setItem('auth_token', token);
+              console.log("🔑 [main.tsx] JWT token extracted from transformed query parameter", {
+                tokenLength: token.length,
+                tokenParts: tokenParts.length,
+              });
+              tokenFromTransformedQuery = true;
+              // Don't include auth_token in final URL (remove from query string)
+              continue;
+            }
           } catch (e) {
             console.error("❌ [main.tsx] Failed to extract token from transformed query param:", e);
           }

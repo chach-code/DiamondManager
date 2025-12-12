@@ -15,10 +15,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/user", async (req: any, res) => {
     try {
       let userId: string | undefined;
+      let authMethod: string = 'none';
       
       // Try session cookie auth first
       if (req.isAuthenticated && typeof req.isAuthenticated === 'function' && req.isAuthenticated() && req.user) {
         userId = req.user.claims?.sub;
+        authMethod = 'cookie';
+        console.log("🔍 [routes] /api/auth/user: Cookie auth successful, userId:", userId);
       } else {
         // Fall back to JWT token auth (for Safari cookie issues)
         const authHeader = req.headers.authorization;
@@ -27,24 +30,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const token = authHeader.substring(7);
           const jwtSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret';
           
+          console.log("🔑 [routes] /api/auth/user: Attempting JWT verification", {
+            hasToken: !!token,
+            tokenLength: token.length,
+            tokenPreview: token.substring(0, 50) + '...',
+            jwtSecretLength: jwtSecret.length,
+            jwtSecretPreview: jwtSecret.substring(0, 10) + '...',
+          });
+          
           try {
             const decoded = jwt.verify(token, jwtSecret) as any;
+            console.log("✅ [routes] /api/auth/user: JWT verification successful", {
+              decodedKeys: Object.keys(decoded || {}),
+              userId: decoded?.userId,
+              email: decoded?.email,
+              iat: decoded?.iat,
+              exp: decoded?.exp,
+              expired: decoded?.exp ? Date.now() / 1000 > decoded.exp : null,
+            });
+            
             userId = decoded.userId;
-          } catch (err) {
+            authMethod = 'jwt';
+          } catch (err: any) {
             // JWT invalid or expired
-            console.log("JWT verification failed for /api/auth/user:", err);
+            console.error("❌ [routes] /api/auth/user: JWT verification failed", {
+              error: err.message,
+              name: err.name,
+              expiredAt: err.expiredAt,
+              tokenPreview: token.substring(0, 50) + '...',
+            });
           }
+        } else {
+          console.log("🔍 [routes] /api/auth/user: No Authorization header found");
         }
       }
 
       if (!userId) {
+        console.log("⚠️ [routes] /api/auth/user: No userId found, returning null", { authMethod });
         return res.json(null);
       }
 
+      console.log("🔍 [routes] /api/auth/user: Fetching user from database", { userId, authMethod });
       const user = await storage.getUser(userId);
+      if (user) {
+        console.log("✅ [routes] /api/auth/user: User found", { userId, email: user.email });
+      } else {
+        console.warn("⚠️ [routes] /api/auth/user: User not found in database", { userId });
+      }
       res.json(user || null);
     } catch (error) {
-      console.error("Error fetching user:", error);
+      console.error("❌ [routes] /api/auth/user: Error fetching user:", error);
       // Return null on error rather than 500, so frontend can handle gracefully
       res.json(null);
     }

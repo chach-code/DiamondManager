@@ -61,7 +61,13 @@ export function useAuth() {
         const token = getAuthToken();
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
-          console.log("🔑 [useAuth] Including JWT token in Authorization header");
+          console.log("🔑 [useAuth] Including JWT token in Authorization header", {
+            tokenLength: token.length,
+            tokenPreview: token.substring(0, 50) + '...',
+            tokenEnd: '...' + token.substring(token.length - 20),
+            // Decode token header for debugging (first part before first dot)
+            tokenParts: token.split('.').map((part, i) => i === 0 ? part.substring(0, 50) + '...' : (i < 2 ? part.substring(0, 20) + '...' : part.substring(0, 20) + '...')),
+          });
         } else {
           console.warn("⚠️ [useAuth] shouldUseTokenAuth() is true but no token found in localStorage");
         }
