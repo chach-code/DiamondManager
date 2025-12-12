@@ -56,13 +56,10 @@ export function useAuth() {
       
       const res = await fetch(apiUrl, {
         credentials: "include", // CRITICAL: Must include credentials for cookies
-        cache: "no-cache",
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          // Note: Removed 'Expires' header as it causes CORS preflight failures
-          // The Cache-Control header is sufficient for cache control
-        },
+        cache: "no-cache", // Browser handles cache control automatically
+        // Note: Removed all custom headers (Cache-Control, Pragma, Expires) to avoid CORS preflight issues
+        // The server CORS config only allows 'Content-Type' and 'Authorization' headers
+        // The 'cache: "no-cache"' option is sufficient for preventing caching
       });
 
       // Log response details
