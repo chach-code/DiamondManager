@@ -190,6 +190,16 @@ export default function Home() {
                 selectedTeamId={selectedTeamId}
                 onTeamSelect={handleTeamSelect}
               />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-green-700 dark:text-green-300 hover:bg-green-500/20"
+                title="Log out"
+              >
+                <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline ml-1.5">Log out</span>
+              </Button>
             </div>
           </div>
         </div>

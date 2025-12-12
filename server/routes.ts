@@ -196,21 +196,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dev-only debug endpoint to inspect session and user data
-  if (process.env.NODE_ENV !== "production") {
-    app.get("/api/debug/session", (req: any, res) => {
-      try {
-        // Do not accidentally leak sensitive info in production — this route
-        // is only enabled in non-production environments.
-        const session = req.session || null;
-        const user = req.user || null;
-        res.json({ session, user });
-      } catch (err) {
-        console.error("Debug endpoint error:", err);
-        res.status(500).json({ message: "Debug endpoint failed" });
-      }
-    });
-  }
+  // Debug endpoint to inspect session and user data (available in all environments for troubleshooting)
+  app.get("/api/debug/session", (req: any, res) => {
+    try {
+      // Return session and user info for debugging authentication issues
+      // Note: This exposes session structure but not sensitive tokens
+      const session = req.session || null;
+      const user = req.user || null;
+      const isAuthenticated = req.isAuthenticated ? req.isAuthenticated() : false;
+      
+      res.json({ 
+        isAuthenticated,
+        hasSession: !!req.session,
+        hasUser: !!req.user,
+        user: user ? {
+          hasClaims: !!user.claims,
+          hasExpiresAt: !!user.expires_at,
+          hasRefreshToken: !!user.refresh_token,
+          expiresAt: user.expires_at,
+          userId: user.claims?.sub,
+          userKeys: Object.keys(user),
+        } : null,
+        sessionKeys: session ? Object.keys(session) : [],
+      });
+    } catch (err) {
+      console.error("Debug endpoint error:", err);
+      res.status(500).json({ message: "Debug endpoint failed", error: String(err) });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
