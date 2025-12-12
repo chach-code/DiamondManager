@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { User } from "@shared/schema";
 import { getQueryFn } from "@/lib/queryClient";
 
 export function useAuth() {
-  const [isGuestMode, setIsGuestMode] = useState(() => {
+  const [isGuestMode, setGuestModeState] = useState(() => {
     // Initialize from localStorage on mount
     // Safari might throw an error if localStorage is not available (private mode, etc.)
     try {
@@ -14,6 +14,22 @@ export function useAuth() {
       return true;
     }
   });
+
+  // Wrapper to persist guest mode to localStorage
+  // Memoized to prevent unnecessary re-renders and make it safe for useEffect dependencies
+  const setIsGuestMode = useCallback((value: boolean) => {
+    try {
+      if (value) {
+        localStorage.setItem("guestMode", "true");
+      } else {
+        localStorage.removeItem("guestMode");
+      }
+    } catch (e) {
+      console.warn("Failed to update localStorage:", e);
+      // Still update state even if localStorage fails
+    }
+    setGuestModeState(value);
+  }, []);
 
   // ALWAYS check for authentication, even in guest mode
   // This ensures we detect when user logs in via OAuth
@@ -33,16 +49,12 @@ export function useAuth() {
   // If we get a user, clear guest mode
   useEffect(() => {
     if (user && isGuestMode) {
-      try {
-        localStorage.removeItem("guestMode");
-        setIsGuestMode(false);
-        // Don't call refetch() here - React Query will automatically update
-        // and calling refetch could cause infinite loops
-      } catch (e) {
-        console.warn("Failed to update localStorage:", e);
-      }
+      // setIsGuestMode now handles localStorage removal internally
+      setIsGuestMode(false);
+      // Don't call refetch() here - React Query will automatically update
+      // and calling refetch could cause infinite loops
     }
-  }, [user, isGuestMode]); // Removed refetch from dependencies to prevent infinite loop
+  }, [user, isGuestMode, setIsGuestMode]);
 
   // If user is authenticated, override guest mode
   const finalIsGuestMode = user ? false : isGuestMode;
