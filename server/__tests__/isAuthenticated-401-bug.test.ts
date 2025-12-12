@@ -190,6 +190,54 @@ describe('isAuthenticated middleware bug reproduction', () => {
   });
 
   /**
+   * BUG REPRODUCTION: Token expired but no refresh_token available
+   * 
+   * This reproduces the exact production bug:
+   * - User is authenticated (session exists)
+   * - Token has expired
+   * - But refresh_token is missing/null
+   * - Result: 401 Unauthorized
+   */
+  it('should return 401 when token expired and refresh_token is missing (PRODUCTION BUG)', async () => {
+    const testApp = express();
+    testApp.use(express.json());
+    
+    // Simulate expired token (past expiration)
+    const expiredExp = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
+    
+    const sessionMw = (req: any, res: any, next: any) => {
+      req.session = { 
+        cookie: {},
+        destroy: jest.fn((callback: any) => callback(null)),
+      };
+      req.isAuthenticated = jest.fn(() => true);
+      req.logout = jest.fn((callback: any) => callback(null));
+      req.user = {
+        claims: { sub: 'user-123' },
+        expires_at: expiredExp, // Token expired
+        // refresh_token is missing - this is the bug
+      };
+      next();
+    };
+    
+    testApp.use(sessionMw);
+    testApp.post('/api/teams', isAuthenticated, (req: any, res: any) => {
+      res.json({ success: true });
+    });
+
+    const response = await request(testApp)
+      .post('/api/teams')
+      .set('Cookie', 'connect.sid=s%3Atest-session-id.test')
+      .send({ name: 'Test Team' })
+      .expect(401);
+
+    expect(response.body).toMatchObject({ 
+      message: 'Unauthorized',
+      code: 'SESSION_EXPIRED_NO_REFRESH_TOKEN'
+    });
+  });
+
+  /**
    * Expected behavior: Should succeed when user is properly authenticated
    */
   it('should succeed when user is authenticated with valid expires_at', async () => {

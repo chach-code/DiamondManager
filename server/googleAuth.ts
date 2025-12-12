@@ -301,8 +301,42 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Token expired - try to refresh
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
-    console.error("Authentication failed: Token expired and no refresh token available");
-    return res.status(401).json({ message: "Unauthorized" });
+    console.error("Authentication failed: Token expired and no refresh token available. User needs to re-authenticate.", {
+      userId: user.claims?.sub,
+      hasClaims: !!user.claims,
+      expiresAt: user.expires_at,
+      now: Math.floor(Date.now() / 1000),
+    });
+    
+    // Clear the invalid session so user can re-authenticate
+    // This prevents the user from being stuck with an invalid session
+    if (typeof req.logout === 'function') {
+      req.logout((err: any) => {
+        if (err) {
+          console.error("Failed to logout invalid session:", err);
+        }
+        if (req.session) {
+          req.session.destroy((destroyErr: any) => {
+            if (destroyErr) {
+              console.error("Failed to destroy invalid session:", destroyErr);
+            }
+          });
+        }
+      });
+    } else if (req.session) {
+      // If logout is not available, just destroy the session
+      req.session.destroy((destroyErr: any) => {
+        if (destroyErr) {
+          console.error("Failed to destroy invalid session:", destroyErr);
+        }
+      });
+    }
+    
+    return res.status(401).json({ 
+      message: "Unauthorized",
+      // Include a hint that re-authentication is needed
+      code: "SESSION_EXPIRED_NO_REFRESH_TOKEN"
+    });
   }
 
   try {
