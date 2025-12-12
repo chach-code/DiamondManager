@@ -207,10 +207,48 @@ export async function setupAuth(app: Express) {
   // CALLBACK
   app.get(
     "/api/callback",
-    passport.authenticate("google", {
-      successReturnToOrRedirect: getFrontendRedirectUrl(),
-      failureRedirect: "/api/login",
-    })
+    (req: any, res: any, next: any) => {
+      // Custom handler to ensure session is saved before redirect
+      passport.authenticate("google", (err: any, user: any, info: any) => {
+        if (err) {
+          console.error("OAuth callback error:", err);
+          return res.redirect("/api/login");
+        }
+        if (!user) {
+          console.error("OAuth callback: no user", info);
+          return res.redirect("/api/login");
+        }
+        
+        // Log in the user
+        req.logIn(user, (loginErr: any) => {
+          if (loginErr) {
+            console.error("Failed to log in user after OAuth:", loginErr);
+            return res.redirect("/api/login");
+          }
+          
+          // CRITICAL: Explicitly save session after successful auth
+          // Mobile Safari needs this to persist the session cookie
+          req.session.save((saveErr: any) => {
+            if (saveErr) {
+              console.error("Failed to save session after OAuth callback:", saveErr);
+              return res.redirect("/api/login");
+            }
+            
+            // Log session info for debugging
+            console.log("OAuth callback successful, session saved", {
+              userId: user.claims?.sub,
+              sessionId: req.sessionID,
+              cookieSecure: req.session.cookie.secure,
+              cookieSameSite: req.session.cookie.sameSite,
+            });
+            
+            // Redirect after session is saved
+            const redirectUrl = getFrontendRedirectUrl();
+            res.redirect(redirectUrl);
+          });
+        });
+      })(req, res, next);
+    }
   );
 
   app.get("/api/logout", (req, res) => {

@@ -57,10 +57,11 @@ export function useAuth() {
     // Check if we're on /app path (likely after OAuth redirect)
     const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
     const isAppPath = pathname.includes('/app');
-    const oauthRedirect = typeof window !== 'undefined' && sessionStorage.getItem('oauth_redirect') === 'true';
+    const oauthRedirectFlag = typeof window !== 'undefined' ? sessionStorage.getItem('oauth_redirect') : null;
+    const oauthRedirect = oauthRedirectFlag !== null; // Any value means we came from OAuth
     
     if (isAppPath && !isLoading) {
-      // Clear the OAuth redirect flag
+      // Clear the OAuth redirect flag after checking
       if (typeof window !== 'undefined' && oauthRedirect) {
         sessionStorage.removeItem('oauth_redirect');
       }
@@ -68,11 +69,22 @@ export function useAuth() {
       // After redirect, give server time to set session cookie, then refetch
       // This is especially important on Safari which may not send cookies immediately
       // Use longer delay on mobile Safari to account for slower cookie propagation
-      const delay = oauthRedirect ? 800 : 300; // Longer delay after OAuth redirect
+      const delay = oauthRedirect ? 1000 : 300; // Longer delay after OAuth redirect for mobile Safari
       const timer = setTimeout(() => {
         // Force a refetch with cache bypass
         // Using refetch() ensures we get fresh data after OAuth redirect
+        // For mobile Safari, we need to be aggressive about bypassing cache
+        console.log("Forcing auth refetch after OAuth redirect, delay:", delay);
         refetch();
+        
+        // Also try a second refetch after a longer delay for mobile Safari
+        // This handles cases where cookies aren't immediately available
+        if (oauthRedirect) {
+          setTimeout(() => {
+            console.log("Second auth refetch for mobile Safari");
+            refetch();
+          }, 2000);
+        }
       }, delay);
       
       return () => clearTimeout(timer);

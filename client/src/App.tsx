@@ -52,8 +52,13 @@ function AppRouter() {
     });
   }
 
-  // Early return AFTER all hooks are called
-  if (isLoading) {
+  // CRITICAL: Don't block landing page rendering during auth loading
+  // The landing page should always be accessible, even while auth is loading
+  // Only show loading spinner if we're on /app (where we need auth state)
+  const isAppRoute = location.includes('/app');
+  
+  // Only show loading spinner if we're on app route AND loading
+  if (isLoading && isAppRoute) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

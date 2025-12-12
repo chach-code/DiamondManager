@@ -35,8 +35,14 @@ if (typeof window !== 'undefined') {
   // Store a flag to indicate we just redirected from OAuth
   const pathname = window.location.pathname;
   if (pathname.includes('/app')) {
-    // Set a flag that we can check in useAuth to force refetch
-    sessionStorage.setItem('oauth_redirect', 'true');
+    // Check if this is a fresh page load (not a navigation)
+    // Fresh loads on /app likely mean we came from OAuth redirect
+    const oauthRedirect = sessionStorage.getItem('oauth_redirect');
+    if (!oauthRedirect) {
+      // Set a flag that we can check in useAuth to force refetch
+      // Use timestamp to ensure we only trigger once
+      sessionStorage.setItem('oauth_redirect', Date.now().toString());
+    }
   }
 }
 

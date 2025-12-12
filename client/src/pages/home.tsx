@@ -303,8 +303,8 @@ export default function Home() {
             </button>
           </p>
         </div>
-      ) : !isAuthenticated && !authLoading ? (
-        // User is not authenticated and not in guest mode - show login prompt
+      ) : (!isAuthenticated && !authLoading && !isGuestMode) ? (
+        // User is not authenticated, not loading, and not in guest mode - show login prompt
         <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
@@ -368,8 +368,8 @@ export default function Home() {
         
         {/* Show tabs for guest mode, not authenticated, or when authenticated with team */}
         {/* CRITICAL: This ensures buttons are visible in all scenarios, including mobile */}
-        {/* Also show during loading if in guest mode (to prevent button flicker) */}
-        {((isGuestMode || !isAuthenticated || selectedTeamId) && !authLoading) && (
+        {/* Show tabs when: in guest mode, not authenticated (and done loading), or authenticated with team */}
+        {(isGuestMode || (!isAuthenticated && !authLoading) || selectedTeamId) && (
           <Tabs defaultValue="roster" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto" data-testid="tabs-navigation">
               <TabsTrigger value="roster" data-testid="tab-roster">
