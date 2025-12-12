@@ -34,14 +34,22 @@ if (typeof window !== 'undefined') {
   // We need to ensure React Query refetches auth status
   // Store a flag to indicate we just redirected from OAuth
   const pathname = window.location.pathname;
+  const urlParams = new URLSearchParams(window.location.search);
+  const oauthCallback = urlParams.get('oauth_callback') === '1';
+  
   if (pathname.includes('/app')) {
     // Check if this is a fresh page load (not a navigation)
     // Fresh loads on /app likely mean we came from OAuth redirect
     const oauthRedirect = sessionStorage.getItem('oauth_redirect');
-    if (!oauthRedirect) {
+    if (!oauthRedirect || oauthCallback) {
       // Set a flag that we can check in useAuth to force refetch
       // Use timestamp to ensure we only trigger once
       sessionStorage.setItem('oauth_redirect', Date.now().toString());
+      console.log("🚀 [main.tsx] OAuth redirect detected, setting flag", {
+        pathname,
+        oauthCallback,
+        hasExistingFlag: !!oauthRedirect,
+      });
     }
   }
 }

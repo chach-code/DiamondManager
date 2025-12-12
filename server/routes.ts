@@ -205,22 +205,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user || null;
       const isAuthenticated = req.isAuthenticated ? req.isAuthenticated() : false;
       
-      res.json({ 
+      // Enhanced debugging info for mobile Safari
+      const debugInfo = { 
         isAuthenticated,
         hasSession: !!req.session,
         hasUser: !!req.user,
+        sessionId: req.sessionID,
+        cookieHeader: req.headers.cookie || 'none',
+        cookieInfo: req.session?.cookie ? {
+          secure: req.session.cookie.secure,
+          sameSite: req.session.cookie.sameSite,
+          httpOnly: req.session.cookie.httpOnly,
+          maxAge: req.session.cookie.maxAge,
+        } : null,
         user: user ? {
           hasClaims: !!user.claims,
           hasExpiresAt: !!user.expires_at,
           hasRefreshToken: !!user.refresh_token,
           expiresAt: user.expires_at,
           userId: user.claims?.sub,
+          email: user.claims?.email,
           userKeys: Object.keys(user),
         } : null,
         sessionKeys: session ? Object.keys(session) : [],
-      });
+        headers: {
+          origin: req.get('origin'),
+          referer: req.get('referer'),
+          userAgent: req.get('user-agent')?.substring(0, 100),
+        },
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.log("🔍 [DEBUG] Session debug endpoint called:", JSON.stringify(debugInfo, null, 2));
+      res.json(debugInfo);
     } catch (err) {
-      console.error("Debug endpoint error:", err);
+      console.error("❌ [DEBUG] Debug endpoint error:", err);
       res.status(500).json({ message: "Debug endpoint failed", error: String(err) });
     }
   });

@@ -234,17 +234,32 @@ export async function setupAuth(app: Express) {
               return res.redirect("/api/login");
             }
             
-            // Log session info for debugging
-            console.log("OAuth callback successful, session saved", {
+            // Log session info for debugging (CRITICAL for mobile Safari debugging)
+            const sessionInfo = {
               userId: user.claims?.sub,
+              email: user.claims?.email,
               sessionId: req.sessionID,
               cookieSecure: req.session.cookie.secure,
               cookieSameSite: req.session.cookie.sameSite,
-            });
+              cookieHttpOnly: req.session.cookie.httpOnly,
+              cookieMaxAge: req.session.cookie.maxAge,
+              hasSessionStore: !!req.sessionStore,
+              userAgent: req.get('user-agent'),
+              origin: req.get('origin'),
+              referer: req.get('referer'),
+            };
+            console.log("✅ OAuth callback successful, session saved:", JSON.stringify(sessionInfo, null, 2));
+            
+            // Set response headers for debugging
+            res.setHeader('X-Session-Id', req.sessionID);
+            res.setHeader('X-User-Id', user.claims?.sub || 'unknown');
             
             // Redirect after session is saved
+            // Add query param to help frontend detect OAuth redirect
             const redirectUrl = getFrontendRedirectUrl();
-            res.redirect(redirectUrl);
+            const redirectUrlWithParam = `${redirectUrl}?oauth_callback=1&t=${Date.now()}`;
+            console.log("Redirecting to:", redirectUrlWithParam);
+            res.redirect(redirectUrlWithParam);
           });
         });
       })(req, res, next);
