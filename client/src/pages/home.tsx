@@ -33,7 +33,7 @@ const DEMO_PLAYERS: Array<Omit<Player, 'teamId' | 'createdAt' | 'updatedAt'>> = 
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { isGuestMode, user, isAuthenticated } = useAuth();
+  const { isGuestMode, user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { teams, isLoading: teamsLoading, getDefaultTeamId, setLastSelectedTeamId } = useTeams();
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const { 
@@ -216,6 +216,23 @@ export default function Home() {
               Sign in to save your progress.
             </button>
           </p>
+        </div>
+      ) : !isAuthenticated && !authLoading ? (
+        // User is not authenticated and not in guest mode - show login prompt
+        <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Sign in to save your teams and lineups.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => window.location.href = getApiNavUrl("/api/login")}
+            data-testid="button-login-unauthenticated"
+          >
+            Sign In with Google
+          </Button>
         </div>
       ) : null}
       <div className="relative h-[400px] overflow-hidden">
