@@ -7,7 +7,26 @@ const TOKEN_KEY = 'auth_token';
 
 export function getAuthToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    // Try localStorage first
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      return token;
+    }
+    
+    // Fallback to sessionStorage if localStorage is empty
+    const sessionToken = sessionStorage.getItem(TOKEN_KEY);
+    if (sessionToken) {
+      // Try to move to localStorage
+      try {
+        localStorage.setItem(TOKEN_KEY, sessionToken);
+        sessionStorage.removeItem(TOKEN_KEY);
+      } catch (e) {
+        // If localStorage fails, keep using sessionStorage
+      }
+      return sessionToken;
+    }
+    
+    return null;
   } catch (e) {
     console.warn("Failed to get auth token from localStorage:", e);
     return null;

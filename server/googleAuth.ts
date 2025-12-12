@@ -283,11 +283,13 @@ export async function setupAuth(app: Express) {
             
             // Redirect after session is saved
             // Add query param to help frontend detect OAuth redirect
-            // Also include JWT token in URL fragment (not query param for security)
-            // Fragment is not sent to server, only available to client-side JS
+            // Include JWT token in BOTH hash (secure) and query param (fallback for Safari/GitHub Pages)
+            // Hash is more secure but may be lost during GitHub Pages redirect
+            // Query param is less secure but more reliable for Safari
             const redirectUrl = getFrontendRedirectUrl();
-            const redirectUrlWithParam = `${redirectUrl}?oauth_callback=1&t=${Date.now()}#token=${encodeURIComponent(token)}`;
-            console.log("Redirecting to:", redirectUrl.replace(/#token=.*/, '#token=***'));
+            const timestamp = Date.now();
+            const redirectUrlWithParam = `${redirectUrl}?oauth_callback=1&t=${timestamp}&auth_token=${encodeURIComponent(token)}#token=${encodeURIComponent(token)}`;
+            console.log("Redirecting to:", redirectUrl.replace(/[#&]token=.*/g, '***').replace(/auth_token=[^&#]*/g, 'auth_token=***'));
             
             // Log Set-Cookie header if present (express-session sets it automatically)
             const setCookieHeaders = res.getHeaders()['set-cookie'];

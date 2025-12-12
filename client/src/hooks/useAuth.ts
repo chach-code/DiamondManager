@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { User } from "@shared/schema";
 import { getQueryFn } from "@/lib/queryClient";
+import { getAuthToken, shouldUseTokenAuth } from "@/lib/authToken";
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -54,8 +55,23 @@ export function useAuth() {
       };
       console.log("🔍 [useAuth] Checking auth status:", logData);
       
+      // Build headers - include JWT token if using token auth (Safari fallback)
+      const headers: Record<string, string> = {};
+      if (shouldUseTokenAuth()) {
+        const token = getAuthToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+          console.log("🔑 [useAuth] Including JWT token in Authorization header");
+        } else {
+          console.warn("⚠️ [useAuth] shouldUseTokenAuth() is true but no token found in localStorage");
+        }
+      } else {
+        console.log("🍪 [useAuth] Using cookie-based auth (not using JWT token)");
+      }
+      
       const res = await fetch(apiUrl, {
-        credentials: "include", // CRITICAL: Must include credentials for cookies
+        ...(Object.keys(headers).length > 0 && { headers }),
+        credentials: "include", // CRITICAL: Must include credentials for cookies (Chrome)
         cache: "no-cache", // Browser handles cache control automatically
         // Note: Removed all custom headers (Cache-Control, Pragma, Expires) to avoid CORS preflight issues
         // The server CORS config only allows 'Content-Type' and 'Authorization' headers
@@ -231,7 +247,7 @@ export function useAuth() {
           const currentGuestMode = localStorage.getItem("guestMode") === "true";
           const currentShouldCheckAuth = !currentGuestMode;
           
-          // Log cookies for debugging - try multiple methods to check cookies
+          // Log cookies and JWT token for debugging
           const cookieInfo = typeof document !== 'undefined' ? {
             cookieCount: document.cookie.split(';').filter(c => c.trim()).length,
             hasCookies: document.cookie.length > 0,
@@ -240,6 +256,21 @@ export function useAuth() {
             cookiesArray: document.cookie.split(';').map(c => c.trim()),
           } : { cookieCount: 0, hasCookies: false, cookiePreview: 'N/A', allCookies: 'N/A', cookiesArray: [] };
           
+          // Check JWT token status
+          const tokenInfo = (() => {
+            try {
+              const token = getAuthToken();
+              const usingTokenAuth = shouldUseTokenAuth();
+              return {
+                hasToken: !!token,
+                tokenPreview: token ? token.substring(0, 20) + '...' : 'none',
+                usingTokenAuth,
+              };
+            } catch (e) {
+              return { hasToken: false, tokenPreview: 'error', usingTokenAuth: false };
+            }
+          })();
+          
           console.log(`🔄 [useAuth] OAuth redirect refetch attempt ${attemptNumber}/${maxRetries}`, {
             shouldCheckAuth: currentShouldCheckAuth,
             isGuestMode: currentGuestMode,
@@ -247,6 +278,7 @@ export function useAuth() {
             isLoading,
             timerRefExists: !!refetchTimerRef.current,
             ...cookieInfo,
+            ...tokenInfo,
           });
           
           // Always invalidate queries to clear cache

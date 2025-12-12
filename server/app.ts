@@ -51,7 +51,8 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization'], // Authorization header for JWT tokens
+  exposedHeaders: ['X-Session-Id', 'X-User-Id'], // Expose custom headers for debugging
 }));
 
 app.use(express.json({
