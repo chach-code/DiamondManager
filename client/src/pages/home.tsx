@@ -351,6 +351,7 @@ export default function Home() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Show "No Teams Yet" message when authenticated but no teams */}
         {isAuthenticated && !selectedTeamId && !teamsLoading && teams.length === 0 && (
           <div className="text-center py-16">
             <Users className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
@@ -365,7 +366,10 @@ export default function Home() {
           </div>
         )}
         
-        {(!isAuthenticated || selectedTeamId) && (
+        {/* Show tabs for guest mode, not authenticated, or when authenticated with team */}
+        {/* CRITICAL: This ensures buttons are visible in all scenarios, including mobile */}
+        {/* Also show during loading if in guest mode (to prevent button flicker) */}
+        {((isGuestMode || !isAuthenticated || selectedTeamId) && !authLoading) && (
           <Tabs defaultValue="roster" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto" data-testid="tabs-navigation">
               <TabsTrigger value="roster" data-testid="tab-roster">

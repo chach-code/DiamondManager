@@ -34,7 +34,7 @@ export function useAuth() {
   // ALWAYS check for authentication, even in guest mode
   // This ensures we detect when user logs in via OAuth
   // Use returnNull behavior so 401 (not logged in) returns null instead of throwing
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading, refetch } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn<User | null>({ on401: "returnNull" }),
     retry: false,
@@ -44,7 +44,40 @@ export function useAuth() {
     refetchOnMount: true,
     // Don't refetch on window focus - can cause issues
     refetchOnWindowFocus: false,
+    // CRITICAL for Safari/mobile: Don't cache auth status
+    // Safari aggressively caches responses, so we need fresh checks after OAuth redirect
+    staleTime: 0, // Always consider stale - force fresh check
+    gcTime: 0, // Don't cache in memory
   });
+
+  // CRITICAL: Force refetch after OAuth redirect on mobile Safari
+  // Safari and some mobile browsers cache responses aggressively
+  // After OAuth redirect, we need to force a fresh auth check
+  useEffect(() => {
+    // Check if we're on /app path (likely after OAuth redirect)
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isAppPath = pathname.includes('/app');
+    const oauthRedirect = typeof window !== 'undefined' && sessionStorage.getItem('oauth_redirect') === 'true';
+    
+    if (isAppPath && !isLoading) {
+      // Clear the OAuth redirect flag
+      if (typeof window !== 'undefined' && oauthRedirect) {
+        sessionStorage.removeItem('oauth_redirect');
+      }
+      
+      // After redirect, give server time to set session cookie, then refetch
+      // This is especially important on Safari which may not send cookies immediately
+      // Use longer delay on mobile Safari to account for slower cookie propagation
+      const delay = oauthRedirect ? 800 : 300; // Longer delay after OAuth redirect
+      const timer = setTimeout(() => {
+        // Force a refetch with cache bypass
+        // Using refetch() ensures we get fresh data after OAuth redirect
+        refetch();
+      }, delay);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, refetch]); // Only run on mount or when loading state changes
 
   // If we get a user, clear guest mode
   useEffect(() => {

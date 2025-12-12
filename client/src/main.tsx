@@ -28,6 +28,16 @@ if (typeof window !== 'undefined') {
     href: window.location.href,
     hasRoot: !!document.getElementById("root"),
   });
+  
+  // CRITICAL: Detect OAuth callback redirect
+  // After OAuth, the backend redirects to /app
+  // We need to ensure React Query refetches auth status
+  // Store a flag to indicate we just redirected from OAuth
+  const pathname = window.location.pathname;
+  if (pathname.includes('/app')) {
+    // Set a flag that we can check in useAuth to force refetch
+    sessionStorage.setItem('oauth_redirect', 'true');
+  }
 }
 
 const rootElement = document.getElementById("root");
