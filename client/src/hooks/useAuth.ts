@@ -60,7 +60,8 @@ export function useAuth() {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
-          'Expires': '0',
+          // Note: Removed 'Expires' header as it causes CORS preflight failures
+          // The Cache-Control header is sufficient for cache control
         },
       });
 
