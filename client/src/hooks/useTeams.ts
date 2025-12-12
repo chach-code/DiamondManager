@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { Team } from "@shared/schema";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,22 +8,39 @@ const LAST_TEAM_KEY = "lastSelectedTeamId";
 
 export function useTeams() {
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
-  // Fetch all teams for the current user
-  // Only enable the query when user is authenticated to prevent 401 loops
-  // Use explicit boolean checks to ensure we never enable when not authenticated
-  const shouldFetchTeams = Boolean(isAuthenticated && !authLoading);
+  // CRITICAL: Only enable the query when user is DEFINITELY authenticated
+  // Check both isAuthenticated AND user object to be extra safe
+  // This prevents ANY possibility of the query running when not authenticated
+  const shouldFetchTeams = Boolean(
+    !authLoading && // Auth check must be complete
+    isAuthenticated && // Must be authenticated
+    user !== null && // User object must exist
+    user !== undefined // User object must be defined
+  );
   
-  const { data: teams = [], isLoading } = useQuery<Team[]>({
+  const { data: teams = [], isLoading, error } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
     queryFn: getQueryFn<Team[]>({ on401: "throw" }),
-    enabled: shouldFetchTeams, // Only fetch when authenticated
+    enabled: shouldFetchTeams, // CRITICAL: Only fetch when authenticated
     retry: false, // Don't retry on errors (including 401)
     refetchOnMount: false, // Don't refetch on mount if query is disabled
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: false, // Don't refetch on reconnect
+    gcTime: 0, // Don't cache the query data when disabled (prevents stale data)
   });
+
+  // CRITICAL: Cancel/remove query if user becomes unauthenticated
+  // This prevents any pending requests from continuing
+  useEffect(() => {
+    if (!shouldFetchTeams) {
+      // User is not authenticated - cancel any pending queries immediately
+      queryClient.cancelQueries({ queryKey: ["/api/teams"] });
+      // Remove query from cache to prevent it from being used or refetched
+      queryClient.removeQueries({ queryKey: ["/api/teams"] });
+    }
+  }, [shouldFetchTeams, queryClient]);
 
   // Get last selected team ID from localStorage
   const getLastSelectedTeamId = (): string | null => {

@@ -1,16 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { Player, InsertPlayer } from "@shared/schema";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 
 export function useTeamPlayers(teamId: string | null) {
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
-  // Fetch players for a specific team
-  // Only enable when we have a teamId AND user is authenticated
-  // Use explicit boolean checks to ensure we never enable when not authenticated
-  const shouldFetchPlayers = Boolean(teamId && isAuthenticated && !authLoading);
+  // CRITICAL: Only enable when we have a teamId AND user is DEFINITELY authenticated
+  const shouldFetchPlayers = Boolean(
+    teamId &&
+    !authLoading &&
+    isAuthenticated &&
+    user !== null &&
+    user !== undefined
+  );
   
   const { data: players = [], isLoading } = useQuery<Player[]>({
     queryKey: ["/api/teams", teamId, "players"],
@@ -20,7 +25,16 @@ export function useTeamPlayers(teamId: string | null) {
     refetchOnMount: false, // Don't refetch on mount if query is disabled
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: false, // Don't refetch on reconnect
+    gcTime: 0, // Don't cache when disabled
   });
+
+  // CRITICAL: Cancel/remove query if user becomes unauthenticated
+  useEffect(() => {
+    if (!shouldFetchPlayers && !authLoading) {
+      queryClient.cancelQueries({ queryKey: ["/api/teams", teamId, "players"] });
+      queryClient.removeQueries({ queryKey: ["/api/teams", teamId, "players"] });
+    }
+  }, [shouldFetchPlayers, authLoading, teamId, queryClient]);
 
   // Create player mutation
   const createPlayerMutation = useMutation({
