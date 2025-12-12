@@ -6,17 +6,32 @@ import "./index.css";
 // This prevents infinite loops in React effects
 if (typeof window !== 'undefined') {
   const search = window.location.search;
-  // GitHub Pages 404.html redirect uses ?/path format
+  // GitHub Pages 404.html redirect uses ?/path&query format
+  // e.g., ?/DiamondManager/app&oauth_callback=1~and~t=123
   if (search.startsWith('?/')) {
-    const route = search.slice(2).replace(/~and~/g, '&');
-    // Remove query parameters
-    const cleanRoute = route.split('&')[0];
+    const fullQuery = search.slice(2).replace(/~and~/g, '&');
+    const [pathPart, ...queryParts] = fullQuery.split('&');
+    
+    // Extract path
+    // The 404.html script converts /DiamondManager/app to ?/app (keeping base separate)
+    // So pathPart will be just 'app', not '/DiamondManager/app'
+    const cleanRoute = pathPart;
     const pathname = window.location.pathname;
+    // Base path is already in pathname (e.g., /DiamondManager)
     const base = pathname.startsWith('/DiamondManager') ? '/DiamondManager' : '';
-    const fullPath = base && cleanRoute ? `${base}${cleanRoute.startsWith('/') ? cleanRoute : `/${cleanRoute}`}` : pathname;
+    // Construct full path: base + route
+    const fullPath = base && cleanRoute 
+      ? `${base}${cleanRoute.startsWith('/') ? cleanRoute : `/${cleanRoute}`}`
+      : cleanRoute 
+        ? (cleanRoute.startsWith('/') ? cleanRoute : `/${cleanRoute}`)
+        : pathname;
+    
+    // Preserve query parameters (excluding the path part)
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+    const finalUrl = fullPath + queryString;
     
     // Update URL to clean format before React renders
-    window.history.replaceState(null, '', fullPath);
+    window.history.replaceState(null, '', finalUrl);
   }
 }
 
