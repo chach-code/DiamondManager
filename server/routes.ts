@@ -11,14 +11,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth endpoint to get current user
   // Don't use isAuthenticated middleware here - return null if not authenticated
   // This allows the frontend to check auth status without redirecting
+  // Supports both cookie-based and JWT token-based auth
   app.get("/api/auth/user", async (req: any, res) => {
     try {
-      // Check if user is authenticated
-      if (!req.isAuthenticated() || !req.user) {
-        return res.json(null);
+      let userId: string | undefined;
+      
+      // Try session cookie auth first
+      if (req.isAuthenticated && typeof req.isAuthenticated === 'function' && req.isAuthenticated() && req.user) {
+        userId = req.user.claims?.sub;
+      } else {
+        // Fall back to JWT token auth (for Safari cookie issues)
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const jwt = await import('jsonwebtoken');
+          const token = authHeader.substring(7);
+          const jwtSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret';
+          
+          try {
+            const decoded = jwt.verify(token, jwtSecret) as any;
+            userId = decoded.userId;
+          } catch (err) {
+            // JWT invalid or expired
+            console.log("JWT verification failed for /api/auth/user:", err);
+          }
+        }
       }
 
-      const userId = req.user.claims?.sub;
       if (!userId) {
         return res.json(null);
       }

@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTeams } from "@/hooks/useTeams";
 import { useTeamPlayers } from "@/hooks/useTeamPlayers";
 import { getApiNavUrl } from "@/lib/apiConfig";
+import { clearAuthToken } from "@/lib/authToken";
 import heroImage from "@assets/generated_images/baseball_stadium_hero_image.png";
 
 // Demo players for guest mode and authenticated users
@@ -85,13 +86,38 @@ export default function Home() {
     });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (isGuestMode) {
       localStorage.removeItem("guestMode");
+      clearAuthToken(); // Clear JWT token if present
       const base = getBasePath();
       setLocation(base ? `${base}/` : "/");
     } else {
-      window.location.href = getApiNavUrl("/api/logout");
+      // Clear JWT token first
+      clearAuthToken();
+      
+      // Call logout endpoint (clears session cookie)
+      try {
+        const response = await fetch(getApiNavUrl("/api/logout"), {
+          credentials: "include",
+          method: "GET",
+        });
+        
+        if (response.ok) {
+          // Redirect to landing page
+          const base = getBasePath();
+          setLocation(base ? `${base}/` : "/");
+        } else {
+          // Even if logout fails, clear client-side state and redirect
+          const base = getBasePath();
+          setLocation(base ? `${base}/` : "/");
+        }
+      } catch (error) {
+        console.error("Logout error:", error);
+        // Even on error, clear client-side state and redirect
+        const base = getBasePath();
+        setLocation(base ? `${base}/` : "/");
+      }
     }
   };
 

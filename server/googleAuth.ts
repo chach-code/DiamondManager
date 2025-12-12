@@ -10,6 +10,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import memorystore from "memorystore";
+import jwt from "jsonwebtoken";
 
 // -----------------------------------------------------
 
@@ -254,11 +255,48 @@ export async function setupAuth(app: Express) {
             res.setHeader('X-Session-Id', req.sessionID);
             res.setHeader('X-User-Id', user.claims?.sub || 'unknown');
             
+            // Generate JWT token for token-based auth (fallback for Safari)
+            // JWT contains user ID and is signed with session secret
+            const jwtSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret';
+            const jwtPayload = {
+              userId: user.claims?.sub,
+              email: user.claims?.email,
+              iat: Math.floor(Date.now() / 1000),
+              exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days, same as session
+            };
+            const token = jwt.sign(jwtPayload, jwtSecret);
+            
+            console.log("🔑 [OAuth Callback] Generated JWT token for user:", user.claims?.sub);
+            
+            // Log cookie configuration for Safari debugging
+            const cookieConfig = {
+              name: 'connect.sid', // Default express-session cookie name
+              secure: req.session.cookie.secure,
+              sameSite: req.session.cookie.sameSite,
+              httpOnly: req.session.cookie.httpOnly,
+              maxAge: req.session.cookie.maxAge,
+              path: req.session.cookie.path,
+            };
+            
+            console.log("🍪 [OAuth Callback] Cookie configuration:", JSON.stringify(cookieConfig, null, 2));
+            console.log("🍪 [OAuth Callback] Session ID:", req.sessionID);
+            
             // Redirect after session is saved
             // Add query param to help frontend detect OAuth redirect
+            // Also include JWT token in URL fragment (not query param for security)
+            // Fragment is not sent to server, only available to client-side JS
             const redirectUrl = getFrontendRedirectUrl();
-            const redirectUrlWithParam = `${redirectUrl}?oauth_callback=1&t=${Date.now()}`;
-            console.log("Redirecting to:", redirectUrlWithParam);
+            const redirectUrlWithParam = `${redirectUrl}?oauth_callback=1&t=${Date.now()}#token=${encodeURIComponent(token)}`;
+            console.log("Redirecting to:", redirectUrl.replace(/#token=.*/, '#token=***'));
+            
+            // Log Set-Cookie header if present (express-session sets it automatically)
+            const setCookieHeaders = res.getHeaders()['set-cookie'];
+            if (setCookieHeaders) {
+              console.log("🍪 [OAuth Callback] Set-Cookie headers:", Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders]);
+            } else {
+              console.warn("⚠️ [OAuth Callback] No Set-Cookie header found in response!");
+            }
+            
             res.redirect(redirectUrlWithParam);
           });
         });
@@ -273,12 +311,8 @@ export async function setupAuth(app: Express) {
         return res.status(500).send("Logout failed");
       }
       req.session?.destroy(() => {
-        // Redirect to landing page on logout
-        const appOrigin = process.env.APP_ORIGIN || 'https://chach-code.github.io';
-        const redirectUrl = appOrigin.includes('github.io') 
-          ? `${appOrigin}/DiamondManager/`
-          : `${appOrigin}/`;
-        res.redirect(redirectUrl);
+        // Return success - frontend will clear JWT token and redirect
+        res.json({ success: true });
       });
     });
   });
@@ -287,17 +321,49 @@ export async function setupAuth(app: Express) {
 // -----------------------------------------------------
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
+  // HYBRID AUTH: Try session cookie first, fall back to JWT token
+  let user = req.user as any;
+  let authMethod = 'cookie';
 
-  // Check if session is authenticated first
-  if (!req.isAuthenticated()) {
-    console.error("Authentication failed: req.isAuthenticated() returned false");
-    return res.status(401).json({ message: "Unauthorized" });
+  // Check session-based auth first (primary method)
+  if (req.isAuthenticated() && user) {
+    // Session cookie auth succeeded
+    authMethod = 'cookie';
+  } else {
+    // Fall back to JWT token auth (for Safari cookie issues)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const jwtSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret';
+      
+      try {
+        const decoded = jwt.verify(token, jwtSecret) as any;
+        if (decoded.userId) {
+          // JWT is valid, fetch user from database
+          const { storage } = await import("./storage");
+          const dbUser = await storage.getUser(decoded.userId);
+          
+          if (dbUser) {
+            // Create a mock user object similar to passport user structure
+            user = {
+              claims: {
+                sub: dbUser.id,
+                email: dbUser.email,
+              },
+            };
+            authMethod = 'jwt';
+            console.log("🔑 [Auth] Authenticated via JWT token for user:", dbUser.id);
+          }
+        }
+      } catch (err) {
+        console.error("JWT verification failed:", err);
+      }
+    }
   }
 
-  // Check if user object exists
+  // If still not authenticated, return 401
   if (!user) {
-    console.error("Authentication failed: req.user is undefined/null");
+    console.error("Authentication failed: No valid session cookie or JWT token");
     return res.status(401).json({ message: "Unauthorized" });
   }
 

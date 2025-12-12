@@ -223,23 +223,29 @@ export function useAuth() {
       
       // Retry function that attempts to refetch auth status
       const attemptRefetch = (attemptNumber: number, delay: number) => {
+        console.log(`⏰ [useAuth] Scheduling retry attempt ${attemptNumber}/${maxRetries} in ${delay}ms`);
         const timerId = setTimeout(() => {
+          console.log(`⏰ [useAuth] Retry attempt ${attemptNumber}/${maxRetries} EXECUTING NOW`);
+          
           // Check current guest mode state
           const currentGuestMode = localStorage.getItem("guestMode") === "true";
           const currentShouldCheckAuth = !currentGuestMode;
           
-          // Log cookies for debugging
+          // Log cookies for debugging - try multiple methods to check cookies
           const cookieInfo = typeof document !== 'undefined' ? {
             cookieCount: document.cookie.split(';').filter(c => c.trim()).length,
             hasCookies: document.cookie.length > 0,
-            cookiePreview: document.cookie.substring(0, 150),
-          } : { cookieCount: 0, hasCookies: false, cookiePreview: 'N/A' };
+            cookiePreview: document.cookie.substring(0, 200),
+            allCookies: document.cookie, // Log full cookie string for debugging
+            cookiesArray: document.cookie.split(';').map(c => c.trim()),
+          } : { cookieCount: 0, hasCookies: false, cookiePreview: 'N/A', allCookies: 'N/A', cookiesArray: [] };
           
           console.log(`🔄 [useAuth] OAuth redirect refetch attempt ${attemptNumber}/${maxRetries}`, {
             shouldCheckAuth: currentShouldCheckAuth,
             isGuestMode: currentGuestMode,
             hasUser: !!user,
             isLoading,
+            timerRefExists: !!refetchTimerRef.current,
             ...cookieInfo,
           });
           
@@ -289,12 +295,22 @@ export function useAuth() {
       };
       
       // Start the retry sequence
+      console.log(`🚀 [useAuth] Starting retry sequence with ${maxRetries} retries, initial delay: ${initialDelay}ms`);
       attemptRefetch(1, initialDelay);
       
+      // IMPORTANT: Don't clear the timeout in cleanup if we're still on the app path
+      // This ensures retries can complete even if component re-renders
       return () => {
-        if (refetchTimerRef.current) {
-          clearTimeout(refetchTimerRef.current);
-          refetchTimerRef.current = null;
+        // Only clear if we navigate away from /app
+        const currentPathname = typeof window !== 'undefined' ? window.location.pathname : '';
+        if (!currentPathname.includes('/app')) {
+          console.log("🧹 [useAuth] Cleaning up retry timer (navigated away from /app)");
+          if (refetchTimerRef.current) {
+            clearTimeout(refetchTimerRef.current);
+            refetchTimerRef.current = null;
+          }
+        } else {
+          console.log("⏸️ [useAuth] Skipping cleanup (still on /app, retries may be in progress)");
         }
       };
     }

@@ -57,13 +57,31 @@ if (typeof window !== 'undefined') {
     hasRoot: !!document.getElementById("root"),
   });
   
-  // CRITICAL: Detect OAuth callback redirect
-  // After OAuth, the backend redirects to /app
-  // We need to ensure React Query refetches auth status
-  // Store a flag to indicate we just redirected from OAuth
+  // CRITICAL: Detect OAuth callback redirect and extract JWT token
+  // After OAuth, the backend redirects to /app with JWT in URL hash
   const pathname = window.location.pathname;
   const urlParams = new URLSearchParams(window.location.search);
   const oauthCallback = urlParams.get('oauth_callback') === '1';
+  
+  // Extract JWT token from URL hash if present (OAuth callback)
+  const hash = window.location.hash;
+  if (hash) {
+    const hashParams = new URLSearchParams(hash.substring(1)); // Remove '#' prefix
+    const token = hashParams.get('token');
+    if (token) {
+      // Store JWT token in localStorage for Safari fallback
+      try {
+        localStorage.setItem('auth_token', token);
+        console.log("🔑 [main.tsx] JWT token stored from OAuth callback");
+        // Clean up URL hash
+        const cleanHash = hash.replace(/#token=[^&]*&?/, '').replace(/^#&/, '#').replace(/^#$/, '');
+        const newUrl = window.location.pathname + window.location.search + (cleanHash || '');
+        window.history.replaceState(null, '', newUrl);
+      } catch (e) {
+        console.warn("Failed to store JWT token:", e);
+      }
+    }
+  }
   
   if (pathname.includes('/app')) {
     // Check if this is a fresh page load (not a navigation)

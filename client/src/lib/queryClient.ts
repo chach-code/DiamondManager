@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getApiUrl } from "./apiConfig";
+import { getAuthToken, shouldUseTokenAuth } from "./authToken";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -15,13 +16,31 @@ export async function apiRequest(
 ): Promise<Response> {
   const apiUrl = getApiUrl(url);
   
+  // Build headers - include JWT token if using token auth
+  const headers: Record<string, string> = {};
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Add JWT token if using token-based auth (Safari fallback)
+  // Wrap in try-catch to handle test environments where localStorage might not be available
+  try {
+    if (typeof window !== 'undefined' && shouldUseTokenAuth()) {
+      const token = getAuthToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+  } catch (e) {
+    // Ignore errors in test environment where localStorage might not be available
+  }
+  
   try {
     const res = await fetch(apiUrl, {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
+      headers, // Always include headers object (even if empty) for consistency with tests
       body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
-      // Add cache control for Safari
+      credentials: "include", // Still include credentials for cookie auth (Chrome)
       cache: "no-cache",
     });
 
@@ -45,10 +64,21 @@ export const getQueryFn: <T>(options: {
     const path = queryKey.join("/") as string;
     const apiUrl = getApiUrl(path);
     
+    // Build headers - only include if needed
+    let headers: Record<string, string> | undefined = undefined;
+    
+    // Add JWT token if using token-based auth (Safari fallback)
+    if (shouldUseTokenAuth()) {
+      const token = getAuthToken();
+      if (token) {
+        headers = { "Authorization": `Bearer ${token}` };
+      }
+    }
+    
     try {
       const res = await fetch(apiUrl, {
-        credentials: "include",
-        // Add cache control for Safari
+        ...(headers && { headers }),
+        credentials: "include", // Still include credentials for cookie auth (Chrome)
         cache: "no-cache",
       });
 
