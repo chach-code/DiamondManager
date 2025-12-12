@@ -187,6 +187,149 @@ describe('OAuth Redirect Flow', () => {
     // rather than waiting for the cleanup which may be delayed
   });
 
+  it('should retry auth check on Safari when initial check returns null (cookie timing)', async () => {
+    // Note: Using real timers because React Query doesn't work well with fake timers
+    // This test verifies the retry mechanism exists and functions
+    
+    // Simulate Safari user agent
+    Object.defineProperty(navigator, 'userAgent', {
+      writable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15',
+    });
+
+    // Simulate OAuth callback redirect
+    (window.location as any).search = '?oauth_callback=1&t=1234567890';
+    (window.location as any).pathname = '/DiamondManager/app';
+
+    const mockUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      profileImageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // First attempt returns null (Safari cookie timing issue)
+    // Second attempt succeeds
+    let callCount = 0;
+    (global.fetch as jest.Mock).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // First call: cookie not available yet, returns null
+        return {
+          status: 200,
+          ok: true,
+          json: async () => null,
+          headers: new Headers(),
+          url: 'https://api.example.com/api/auth/user',
+        };
+      } else {
+        // Subsequent calls: cookie available, returns user
+        return {
+          status: 200,
+          ok: true,
+          json: async () => mockUser,
+          headers: new Headers(),
+          url: 'https://api.example.com/api/auth/user',
+        };
+      }
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    // Wait for initial auth check (should return null)
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Initial check should return null (simulating Safari cookie timing)
+    expect(result.current.user).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
+
+    // Wait for retry attempts - Safari retry logic should kick in
+    // With 3 retries at 3s, 4.5s, 6.75s delays, we wait for at least the first retry
+    await waitFor(() => {
+      // Should eventually succeed after retry
+      expect(callCount).toBeGreaterThanOrEqual(2);
+      expect(result.current.user).toMatchObject({
+        id: mockUser.id,
+        email: mockUser.email,
+        firstName: mockUser.firstName,
+      });
+    }, { timeout: 10000 }); // Wait up to 10 seconds for retries
+
+    expect(result.current.isAuthenticated).toBe(true);
+    
+    // Verify multiple fetch calls were made (initial + retries)
+    expect(callCount).toBeGreaterThanOrEqual(2);
+  }, 15000);
+
+  it('should handle Safari OAuth redirect even if initial check fails', async () => {
+    // Note: Using real timers because React Query doesn't work well with fake timers
+    
+    // Simulate Safari user agent (iOS)
+    Object.defineProperty(navigator, 'userAgent', {
+      writable: true,
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    });
+
+    // Simulate OAuth callback redirect
+    sessionStorageMock.setItem('oauth_redirect', Date.now().toString());
+    (window.location as any).pathname = '/DiamondManager/app';
+    (window.location as any).search = '';
+
+    const mockUser = {
+      id: 'user-456',
+      email: 'mobile@example.com',
+      firstName: 'Mobile',
+      lastName: 'User',
+      profileImageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // First attempt returns null, second succeeds
+    let callCount = 0;
+    (global.fetch as jest.Mock).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          status: 200,
+          ok: true,
+          json: async () => null, // Cookie not ready
+          headers: new Headers(),
+          url: 'https://api.example.com/api/auth/user',
+        };
+      } else {
+        return {
+          status: 200,
+          ok: true,
+          json: async () => mockUser,
+          headers: new Headers(),
+          url: 'https://api.example.com/api/auth/user',
+        };
+      }
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    // Wait for retry to succeed (Safari uses 3s initial delay + retries)
+    await waitFor(() => {
+      expect(result.current.user).toBeTruthy();
+      expect(result.current.isAuthenticated).toBe(true);
+    }, { timeout: 10000 });
+
+    expect(result.current.user).toMatchObject({
+      id: mockUser.id,
+      email: mockUser.email,
+    });
+    
+    // Should have made at least 2 calls (initial + retry)
+    expect(callCount).toBeGreaterThanOrEqual(2);
+  }, 15000);
+
   it('should handle CORS errors gracefully during OAuth redirect', async () => {
     (window.location as any).search = '?oauth_callback=1&t=1234567890';
     (window.location as any).pathname = '/DiamondManager/app';

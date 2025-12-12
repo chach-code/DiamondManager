@@ -199,15 +199,20 @@ export function useAuth() {
         window.history.replaceState({}, '', newUrl);
       }
       
-      // After redirect, give server time to set session cookie, then refetch ONCE
-      // Use longer delay to ensure cookies are set (especially for cross-origin)
-      // Increase delay for more reliable cookie propagation
-      const delay = 2000; // 2 seconds for cookie propagation (increased from 1.5s)
+      // After redirect, give server time to set session cookie, then refetch with retries
+      // Safari needs more time for cross-origin cookie propagation
+      // Detect Safari and use longer delays
+      const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const initialDelay = isSafari ? 3000 : 2000; // 3s for Safari, 2s for others
+      const maxRetries = isSafari ? 3 : 2; // More retries for Safari
       
-      console.log(`⏳ [useAuth] Scheduling auth refetch in ${delay}ms after OAuth redirect`, {
+      console.log(`⏳ [useAuth] Scheduling auth refetch with retries after OAuth redirect`, {
+        isSafari,
+        initialDelay,
+        maxRetries,
         hasUser: !!user,
         isLoading,
-        shouldCheckAuth: !isGuestMode, // Will be true now if we cleared guest mode
+        shouldCheckAuth: !isGuestMode,
         wasInGuestMode: isGuestMode,
       });
       
@@ -216,48 +221,75 @@ export function useAuth() {
         clearTimeout(refetchTimerRef.current);
       }
       
-      refetchTimerRef.current = setTimeout(() => {
-        // Check current guest mode state (may have changed due to setIsGuestMode(false))
-        // We need to check the actual state, not the captured closure value
-        const currentGuestMode = localStorage.getItem("guestMode") === "true";
-        const currentShouldCheckAuth = !currentGuestMode;
-        
-        console.log("🔄 [useAuth] Executing OAuth redirect refetch NOW", {
-          shouldCheckAuth: currentShouldCheckAuth,
-          isGuestMode: currentGuestMode,
-          hasUser: !!user,
-          isLoading,
-          cookies: typeof document !== 'undefined' ? document.cookie.substring(0, 100) : 'N/A',
-        });
-        
-        // Always invalidate queries to clear cache - safe even if query is disabled
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        
-        // If query should be enabled (not in guest mode), try to refetch
-        // Note: If guest mode was just cleared, the query will be enabled on next render
-        // We'll try refetch anyway - React Query will handle it appropriately
-        if (currentShouldCheckAuth) {
-          refetch().then((result) => {
-            const userData = result.data;
-            console.log("✅ [useAuth] OAuth redirect refetch completed:", userData ? { 
-              id: userData.id, 
-              email: userData.email 
-            } : 'null (not authenticated)');
-          }).catch(err => {
-            // If refetch fails (e.g., query not enabled yet), the query will auto-refetch on next render
-            console.warn("⚠️ [useAuth] OAuth redirect refetch failed (query may not be enabled yet):", err);
-            // Trigger a re-render by invalidating again - this will cause the query to refetch when enabled
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Retry function that attempts to refetch auth status
+      const attemptRefetch = (attemptNumber: number, delay: number) => {
+        const timerId = setTimeout(() => {
+          // Check current guest mode state
+          const currentGuestMode = localStorage.getItem("guestMode") === "true";
+          const currentShouldCheckAuth = !currentGuestMode;
+          
+          // Log cookies for debugging
+          const cookieInfo = typeof document !== 'undefined' ? {
+            cookieCount: document.cookie.split(';').filter(c => c.trim()).length,
+            hasCookies: document.cookie.length > 0,
+            cookiePreview: document.cookie.substring(0, 150),
+          } : { cookieCount: 0, hasCookies: false, cookiePreview: 'N/A' };
+          
+          console.log(`🔄 [useAuth] OAuth redirect refetch attempt ${attemptNumber}/${maxRetries}`, {
+            shouldCheckAuth: currentShouldCheckAuth,
+            isGuestMode: currentGuestMode,
+            hasUser: !!user,
+            isLoading,
+            ...cookieInfo,
           });
-        } else {
-          // Still in guest mode - query will auto-refetch when guest mode is cleared
-          console.log("⏸️ [useAuth] OAuth redirect detected but still in guest mode, query will auto-refetch when guest mode clears");
-          // Ensure query cache is invalidated so it refetches when enabled
+          
+          // Always invalidate queries to clear cache
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        }
+          
+          if (currentShouldCheckAuth) {
+            refetch().then((result) => {
+              const userData = result.data;
+              if (userData) {
+                // Success! User is authenticated
+                console.log("✅ [useAuth] OAuth redirect refetch succeeded on attempt", attemptNumber, ":", {
+                  id: userData.id,
+                  email: userData.email
+                });
+                refetchTimerRef.current = null;
+              } else if (attemptNumber < maxRetries) {
+                // Still not authenticated, retry with exponential backoff
+                const nextDelay = delay * 1.5; // Exponential backoff
+                console.log(`⚠️ [useAuth] Auth check returned null on attempt ${attemptNumber}, retrying in ${nextDelay}ms...`);
+                attemptRefetch(attemptNumber + 1, nextDelay);
+              } else {
+                // Max retries reached
+                console.warn("❌ [useAuth] OAuth redirect refetch failed after", maxRetries, "attempts - user may not be authenticated");
+                refetchTimerRef.current = null;
+              }
+            }).catch(err => {
+              if (attemptNumber < maxRetries) {
+                // Error occurred, retry with exponential backoff
+                const nextDelay = delay * 1.5;
+                console.warn(`⚠️ [useAuth] Refetch error on attempt ${attemptNumber}, retrying in ${nextDelay}ms:`, err);
+                attemptRefetch(attemptNumber + 1, nextDelay);
+              } else {
+                console.error("❌ [useAuth] OAuth redirect refetch failed after", maxRetries, "attempts:", err);
+                refetchTimerRef.current = null;
+              }
+            });
+          } else {
+            // Still in guest mode - query will auto-refetch when guest mode is cleared
+            console.log("⏸️ [useAuth] Still in guest mode, query will auto-refetch when guest mode clears");
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            refetchTimerRef.current = null;
+          }
+        }, delay);
         
-        refetchTimerRef.current = null;
-      }, delay);
+        refetchTimerRef.current = timerId as unknown as NodeJS.Timeout;
+      };
+      
+      // Start the retry sequence
+      attemptRefetch(1, initialDelay);
       
       return () => {
         if (refetchTimerRef.current) {
