@@ -138,11 +138,12 @@ export function useAuth() {
   const oauthRedirectHandledRef = useRef(false);
   const refetchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // CRITICAL: Only run OAuth redirect logic if auth checking is enabled
-  // Don't run in guest mode or if auth is disabled
+  // CRITICAL: OAuth redirect detection must ALWAYS run, even in guest mode
+  // This is because a user might log in while in guest mode, and we need to detect it
+  // The actual auth check will be enabled/disabled based on shouldCheckAuth, but
+  // the OAuth redirect detection should run regardless
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!shouldCheckAuth) return; // Skip if auth checking is disabled (guest mode)
     
     // Check if we're on /app path (likely after OAuth redirect)
     // Use window.location directly to get fresh values
@@ -159,24 +160,35 @@ export function useAuth() {
     
     const isOAuthRedirect = oauthCallback || hasOAuthFlag;
     
+    // Log for debugging - always log, even if we don't handle it
+    console.log("🔍 [useAuth] OAuth redirect check:", {
+      isAppPath,
+      isLoading,
+      oauthCallback,
+      hasOAuthFlag,
+      isOAuthRedirect,
+      alreadyHandled: oauthRedirectHandledRef.current,
+      shouldCheckAuth,
+      isGuestMode,
+      hasUser: !!user,
+    });
+    
     // CRITICAL: Handle OAuth redirect even during initial loading
-    // The condition should NOT require !isLoading because:
-    // 1. On fresh page load after OAuth, isLoading might still be true
-    // 2. We need to schedule the refetch regardless of loading state
-    // 3. The refetch will wait for cookies to be set (1.5s delay)
-    if (isAppPath && isOAuthRedirect && !oauthRedirectHandledRef.current && shouldCheckAuth) {
-      // Log for debugging
-      console.log("🔍 [useAuth] OAuth redirect detected, scheduling refetch:", {
-        isAppPath,
-        isLoading,
-        oauthCallback,
-        hasOAuthFlag,
-        isOAuthRedirect,
-        shouldCheckAuth,
-        hasUser: !!user,
-      });
+    // AND even if shouldCheckAuth is false (guest mode), because:
+    // 1. User might log in while in guest mode - we need to detect and clear guest mode
+    // 2. On fresh page load after OAuth, isLoading might still be true
+    // 3. We need to schedule the refetch regardless of loading state
+    // 4. The refetch will wait for cookies to be set (2s delay)
+    // If shouldCheckAuth is false, we'll enable it temporarily for the OAuth check
+    if (isAppPath && isOAuthRedirect && !oauthRedirectHandledRef.current) {
       // Mark as handled immediately to prevent multiple executions
       oauthRedirectHandledRef.current = true;
+      
+      // CRITICAL: If we're in guest mode, clear it now because user is logging in
+      if (isGuestMode) {
+        console.log("🔓 [useAuth] Clearing guest mode due to OAuth redirect");
+        setIsGuestMode(false);
+      }
       
       // Clear the OAuth redirect flag after checking
       if (hasOAuthFlag) {
@@ -197,7 +209,8 @@ export function useAuth() {
       console.log(`⏳ [useAuth] Scheduling auth refetch in ${delay}ms after OAuth redirect`, {
         hasUser: !!user,
         isLoading,
-        shouldCheckAuth,
+        shouldCheckAuth: !isGuestMode, // Will be true now if we cleared guest mode
+        wasInGuestMode: isGuestMode,
       });
       
       // Clear any existing timer
@@ -206,25 +219,44 @@ export function useAuth() {
       }
       
       refetchTimerRef.current = setTimeout(() => {
+        // Check current guest mode state (may have changed due to setIsGuestMode(false))
+        // We need to check the actual state, not the captured closure value
+        const currentGuestMode = localStorage.getItem("guestMode") === "true";
+        const currentShouldCheckAuth = !currentGuestMode;
+        
         console.log("🔄 [useAuth] Executing OAuth redirect refetch NOW", {
-          shouldCheckAuth,
+          shouldCheckAuth: currentShouldCheckAuth,
+          isGuestMode: currentGuestMode,
           hasUser: !!user,
           isLoading,
           cookies: typeof document !== 'undefined' ? document.cookie.substring(0, 100) : 'N/A',
         });
         
-        // Force refetch to check if user is now authenticated after OAuth
-        // Use invalidateQueries to force a fresh check, bypassing cache completely
+        // Always invalidate queries to clear cache - safe even if query is disabled
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        refetch().then((result) => {
-          const userData = result.data;
-          console.log("✅ [useAuth] OAuth redirect refetch completed:", userData ? { 
-            id: userData.id, 
-            email: userData.email 
-          } : 'null (not authenticated)');
-        }).catch(err => {
-          console.error("❌ [useAuth] OAuth redirect refetch failed:", err);
-        });
+        
+        // If query should be enabled (not in guest mode), try to refetch
+        // Note: If guest mode was just cleared, the query will be enabled on next render
+        // We'll try refetch anyway - React Query will handle it appropriately
+        if (currentShouldCheckAuth) {
+          refetch().then((result) => {
+            const userData = result.data;
+            console.log("✅ [useAuth] OAuth redirect refetch completed:", userData ? { 
+              id: userData.id, 
+              email: userData.email 
+            } : 'null (not authenticated)');
+          }).catch(err => {
+            // If refetch fails (e.g., query not enabled yet), the query will auto-refetch on next render
+            console.warn("⚠️ [useAuth] OAuth redirect refetch failed (query may not be enabled yet):", err);
+            // Trigger a re-render by invalidating again - this will cause the query to refetch when enabled
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          });
+        } else {
+          // Still in guest mode - query will auto-refetch when guest mode is cleared
+          console.log("⏸️ [useAuth] OAuth redirect detected but still in guest mode, query will auto-refetch when guest mode clears");
+          // Ensure query cache is invalidated so it refetches when enabled
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        }
         
         refetchTimerRef.current = null;
       }, delay);
@@ -241,7 +273,7 @@ export function useAuth() {
     if (!isAppPath) {
       oauthRedirectHandledRef.current = false;
     }
-  }, [isLoading, refetch, shouldCheckAuth, user]); // Run when these change to detect OAuth redirect
+  }, [isLoading, refetch, shouldCheckAuth, isGuestMode, user, setIsGuestMode]); // Run when these change to detect OAuth redirect
 
   // If we get a user, clear guest mode
   useEffect(() => {
