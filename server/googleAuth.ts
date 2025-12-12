@@ -238,11 +238,56 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   // Check if session is authenticated first
   if (!req.isAuthenticated()) {
+    console.error("Authentication failed: req.isAuthenticated() returned false");
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // Check if user object exists and has expiration
-  if (!user?.expires_at) {
+  // Check if user object exists
+  if (!user) {
+    console.error("Authentication failed: req.user is undefined/null");
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // If expires_at is missing but we have a refresh_token, try to refresh to restore it
+  // This handles cases where old sessions don't have expires_at stored
+  if (!user.expires_at && user.refresh_token) {
+    console.log("user.expires_at is missing but refresh_token exists, attempting refresh to restore");
+    try {
+      const { refreshTokenGrant } = await import("openid-client");
+      const config = await getOidcConfig();
+      
+      const refreshed = await refreshTokenGrant(config, user.refresh_token);
+
+      user.claims = refreshed.claims();
+      user.access_token = refreshed.access_token;
+      user.refresh_token = refreshed.refresh_token ?? user.refresh_token;
+      user.expires_at = refreshed.claims()?.exp;
+
+      // Save the refreshed user back to session
+      // This ensures the session is updated with the new expires_at
+      if (req.session) {
+        req.session.save((err: any) => {
+          if (err) {
+            console.error("Failed to save session after token refresh:", err);
+          }
+        });
+      }
+
+      // After refresh, continue with normal flow
+    } catch (error) {
+      console.error("Token refresh failed while restoring expires_at:", error);
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+  }
+
+  // Check if user object has expiration (after potential refresh)
+  if (!user.expires_at) {
+    console.error("Authentication failed: user.expires_at is missing after refresh attempt", {
+      hasUser: !!user,
+      hasClaims: !!user.claims,
+      hasRefreshToken: !!user.refresh_token,
+      userKeys: user ? Object.keys(user) : [],
+    });
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -256,6 +301,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Token expired - try to refresh
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
+    console.error("Authentication failed: Token expired and no refresh token available");
     return res.status(401).json({ message: "Unauthorized" });
   }
 
