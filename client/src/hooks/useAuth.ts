@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { User } from "@shared/schema";
 import { getQueryFn } from "@/lib/queryClient";
 
@@ -107,15 +107,17 @@ export function useAuth() {
     refetchOnMount: true,
     // Don't refetch on window focus - can cause issues
     refetchOnWindowFocus: false,
-    // CRITICAL for Safari/mobile: Don't cache auth status
-    // Safari aggressively caches responses, so we need fresh checks after OAuth redirect
-    staleTime: 0, // Always consider stale - force fresh check
-    gcTime: 0, // Don't cache in memory
+    // Use a small staleTime to allow caching but still detect auth changes
+    // Setting to 0 causes infinite loops, so use 5 seconds as a balance
+    staleTime: 5000, // Consider stale after 5 seconds (allows some caching)
+    gcTime: 60000, // Cache in memory for 1 minute
   });
 
   // CRITICAL: Force refetch after OAuth redirect on mobile Safari
-  // Safari and some mobile browsers cache responses aggressively
-  // After OAuth redirect, we need to force a fresh auth check
+  // Use a ref to track if we've already handled OAuth redirect (prevent infinite loops)
+  const oauthRedirectHandledRef = useRef(false);
+  const refetchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -131,6 +133,8 @@ export function useAuth() {
     const oauthRedirectFlag = sessionStorage.getItem('oauth_redirect');
     const hasOAuthFlag = oauthRedirectFlag !== null;
     
+    const isOAuthRedirect = oauthCallback || hasOAuthFlag;
+    
     // Log for debugging
     console.log("🔍 OAuth redirect detection:", {
       pathname,
@@ -138,11 +142,16 @@ export function useAuth() {
       oauthCallback,
       hasOAuthFlag,
       isLoading,
+      alreadyHandled: oauthRedirectHandledRef.current,
       hasCookies: document.cookie.length > 0,
-      cookies: document.cookie,
+      cookieCount: document.cookie.split(';').length,
     });
     
-    if (isAppPath && !isLoading) {
+    // Only handle OAuth redirect once, and only when not loading
+    if (isAppPath && !isLoading && isOAuthRedirect && !oauthRedirectHandledRef.current) {
+      // Mark as handled immediately to prevent multiple executions
+      oauthRedirectHandledRef.current = true;
+      
       // Clear the OAuth redirect flag after checking
       if (hasOAuthFlag) {
         sessionStorage.removeItem('oauth_redirect');
@@ -154,39 +163,43 @@ export function useAuth() {
         window.history.replaceState({}, '', newUrl);
       }
       
-      // After redirect, give server time to set session cookie, then refetch
-      // This is especially important on Safari which may not send cookies immediately
-      // Use longer delay on mobile Safari to account for slower cookie propagation
-      const isOAuthRedirect = oauthCallback || hasOAuthFlag;
-      const delay = isOAuthRedirect ? 1500 : 300; // Longer delay after OAuth redirect for mobile Safari
+      // After redirect, give server time to set session cookie, then refetch ONCE
+      // Mobile Safari may need a delay for cookie propagation
+      const delay = 1500; // Delay for mobile Safari cookie propagation
       
-      console.log(`⏳ Scheduling auth refetch in ${delay}ms (OAuth redirect: ${isOAuthRedirect})`);
+      console.log(`⏳ Scheduling SINGLE auth refetch in ${delay}ms after OAuth redirect`);
       
-      const timer = setTimeout(() => {
-        console.log("🔄 Forcing auth refetch after OAuth redirect");
-        refetch();
-        
-        // Also try multiple refetches for mobile Safari (cookies may take time to propagate)
-        if (isOAuthRedirect) {
-          setTimeout(() => {
-            console.log("🔄 Second auth refetch for mobile Safari");
-            refetch();
-          }, 2000);
-          
-          setTimeout(() => {
-            console.log("🔄 Third auth refetch for mobile Safari");
-            refetch();
-          }, 4000);
-        }
+      // Clear any existing timer
+      if (refetchTimerRef.current) {
+        clearTimeout(refetchTimerRef.current);
+      }
+      
+      refetchTimerRef.current = setTimeout(() => {
+        console.log("🔄 Forcing auth refetch after OAuth redirect (single attempt)");
+        refetch().catch(err => {
+          console.error("❌ Refetch failed:", err);
+        });
+        refetchTimerRef.current = null;
       }, delay);
       
-      return () => clearTimeout(timer);
+      return () => {
+        if (refetchTimerRef.current) {
+          clearTimeout(refetchTimerRef.current);
+          refetchTimerRef.current = null;
+        }
+      };
     }
-  }, [isLoading, refetch]); // Only run on mount or when loading state changes
+    
+    // Reset the ref if we navigate away from /app
+    if (!isAppPath) {
+      oauthRedirectHandledRef.current = false;
+    }
+  }, [isLoading, refetch]); // Only run when loading state changes
 
   // If we get a user, clear guest mode
   useEffect(() => {
     if (user && isGuestMode) {
+      console.log("✅ [useAuth] User authenticated, clearing guest mode");
       // setIsGuestMode now handles localStorage removal internally
       setIsGuestMode(false);
       // Don't call refetch() here - React Query will automatically update
