@@ -7,8 +7,14 @@ import "./index.css";
 if (typeof window !== 'undefined') {
   const search = window.location.search;
   // GitHub Pages 404.html redirect uses ?/path&query format
-  // e.g., ?/DiamondManager/app&oauth_callback=1~and~t=123
+  // e.g., ?/app&oauth_callback=1~and~t=123
   if (search.startsWith('?/')) {
+    console.log("🔄 [main.tsx] Detected 404.html redirect format, transforming URL", {
+      originalSearch: search,
+      pathname: window.location.pathname,
+      href: window.location.href,
+    });
+    
     const fullQuery = search.slice(2).replace(/~and~/g, '&');
     const [pathPart, ...queryParts] = fullQuery.split('&');
     
@@ -29,6 +35,13 @@ if (typeof window !== 'undefined') {
     // Preserve query parameters (excluding the path part)
     const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
     const finalUrl = fullPath + queryString;
+    
+    console.log("✅ [main.tsx] Transformed URL", {
+      pathPart,
+      queryParts,
+      fullPath,
+      finalUrl,
+    });
     
     // Update URL to clean format before React renders
     window.history.replaceState(null, '', finalUrl);
