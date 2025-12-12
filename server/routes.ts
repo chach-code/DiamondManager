@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertTeamSchema, insertPlayerSchema, insertLineupSchema, type InsertTeam, type InsertPlayer, type InsertLineup } from "@shared/schema";
+import jwt from "jsonwebtoken";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -26,7 +27,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fall back to JWT token auth (for Safari cookie issues)
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
-          const jwt = await import('jsonwebtoken');
           const token = authHeader.substring(7);
           const jwtSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret';
           
@@ -36,6 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tokenPreview: token.substring(0, 50) + '...',
             jwtSecretLength: jwtSecret.length,
             jwtSecretPreview: jwtSecret.substring(0, 10) + '...',
+            hasJwtVerify: typeof jwt.verify === 'function',
           });
           
           try {
