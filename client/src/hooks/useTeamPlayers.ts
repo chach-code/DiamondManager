@@ -22,19 +22,20 @@ export function useTeamPlayers(teamId: string | null) {
     queryFn: getQueryFn<Player[]>({ on401: "throw" }),
     enabled: shouldFetchPlayers,
     retry: false, // Don't retry on errors (including 401)
+    retryOnMount: false, // Don't retry on mount even if there's an error
     refetchOnMount: false, // Don't refetch on mount if query is disabled
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: false, // Don't refetch on reconnect
     gcTime: 0, // Don't cache when disabled
+    staleTime: Infinity, // Never consider data stale
   });
 
-  // CRITICAL: Cancel/remove query if user becomes unauthenticated
+  // CRITICAL: Cancel queries if user becomes unauthenticated
   useEffect(() => {
-    if (!shouldFetchPlayers && !authLoading) {
-      queryClient.cancelQueries({ queryKey: ["/api/teams", teamId, "players"] });
-      queryClient.removeQueries({ queryKey: ["/api/teams", teamId, "players"] });
+    if (!shouldFetchPlayers) {
+      queryClient.cancelQueries({ queryKey: ["/api/teams", teamId, "players"], exact: true });
     }
-  }, [shouldFetchPlayers, authLoading, teamId, queryClient]);
+  }, [shouldFetchPlayers, teamId, queryClient]);
 
   // Create player mutation
   const createPlayerMutation = useMutation({

@@ -25,20 +25,21 @@ export function useTeams() {
     queryFn: getQueryFn<Team[]>({ on401: "throw" }),
     enabled: shouldFetchTeams, // CRITICAL: Only fetch when authenticated
     retry: false, // Don't retry on errors (including 401)
+    retryOnMount: false, // Don't retry on mount even if there's an error
     refetchOnMount: false, // Don't refetch on mount if query is disabled
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: false, // Don't refetch on reconnect
     gcTime: 0, // Don't cache the query data when disabled (prevents stale data)
+    staleTime: Infinity, // Never consider data stale (prevents automatic refetches)
   });
 
-  // CRITICAL: Cancel/remove query if user becomes unauthenticated
-  // This prevents any pending requests from continuing
+  // CRITICAL: Cancel queries if user becomes unauthenticated
+  // Only cancel - don't remove/reset as that might trigger React Query to re-initialize
   useEffect(() => {
     if (!shouldFetchTeams) {
       // User is not authenticated - cancel any pending queries immediately
-      queryClient.cancelQueries({ queryKey: ["/api/teams"] });
-      // Remove query from cache to prevent it from being used or refetched
-      queryClient.removeQueries({ queryKey: ["/api/teams"] });
+      // Use cancelQueries which stops in-flight requests without removing cache
+      queryClient.cancelQueries({ queryKey: ["/api/teams"], exact: true });
     }
   }, [shouldFetchTeams, queryClient]);
 

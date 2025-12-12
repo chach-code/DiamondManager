@@ -52,13 +52,23 @@ export const getQueryFn: <T>(options: {
         cache: "no-cache",
       });
 
-      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-        return null;
+      // CRITICAL: Handle 401 immediately to prevent retry loops
+      if (res.status === 401) {
+        if (unauthorizedBehavior === "returnNull") {
+          return null;
+        }
+        // For "throw" behavior, throw immediately to prevent any retry logic
+        // This ensures React Query doesn't try to retry 401 errors
+        throw new Error(`401: Unauthorized - authentication required`);
       }
 
       await throwIfResNotOk(res);
       return await res.json();
     } catch (error) {
+      // If it's already a 401 error, re-throw immediately (no retries)
+      if (error instanceof Error && error.message.includes('401')) {
+        throw error;
+      }
       // Better error handling for network failures (common on Safari)
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error(`Network error: Unable to connect to server. Please check your internet connection.`);
