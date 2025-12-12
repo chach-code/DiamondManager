@@ -213,6 +213,7 @@ test('should create a new team and switch to it', async ({ page }) => {
 2. Test rendering with different props
 3. Test user interactions (clicks, form submissions, etc.)
 4. Test accessibility if applicable
+5. **CRITICAL**: Verify all buttons have proper color contrast (minimum 4.5:1 ratio) - never white text on white background or dark text on dark background
 
 **If you add an API route:**
 1. Add tests to existing route test file or create new one: `routes.feature.test.ts`
@@ -351,3 +352,23 @@ describe('GET /api/teams', () => {
 - ❌ Write tests that depend on other tests
 - ❌ Mock things that don't need mocking
 - ❌ Write tests that are hard to understand or maintain
+
+## Accessibility & UI Requirements
+
+### Button Contrast Requirements (CRITICAL)
+- **ALL buttons MUST have sufficient color contrast between text and background**
+- Minimum contrast ratio: 4.5:1 for normal text, 3:1 for large text (WCAG AA standards)
+- Light backgrounds (white, light gray): Use dark text (`text-foreground`, `text-gray-900`, `text-black`)
+- Dark backgrounds (dark gray, black): Use light text (`text-white`, `text-gray-100`)
+- Outline buttons: Must have explicit text color classes - never rely on inherited colors
+- When using backdrop blur or semi-transparent backgrounds:
+  - Ensure text color provides sufficient contrast against the blurred/transparent background
+  - Test in both light and dark modes
+  - Never use white text on white backgrounds or dark text on dark backgrounds
+- Example: `className="bg-white text-foreground"` ✓ or `className="bg-white text-white"` ✗
+
+### Other Accessibility Requirements
+- Use semantic HTML elements (button, nav, main, etc.)
+- Add ARIA labels for icon-only buttons and interactive elements
+- Ensure all interactive elements are keyboard accessible
+- Provide visible focus indicators for keyboard navigation

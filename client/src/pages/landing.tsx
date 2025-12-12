@@ -50,7 +50,7 @@ export default function Landing() {
               variant="outline"
               onClick={handleGuestMode}
               data-testid="button-guest-mode"
-              className="bg-background/90 backdrop-blur-sm border-white/30 hover:bg-background hover:border-white/50"
+              className="bg-white/95 backdrop-blur-sm border-white text-foreground hover:bg-white hover:border-white/80 dark:bg-gray-900/95 dark:border-white/30 dark:text-white dark:hover:bg-gray-800"
             >
               Continue as Guest
             </Button>
@@ -107,7 +107,7 @@ export default function Landing() {
               variant="outline"
               onClick={handleGuestMode}
               data-testid="button-guest-mode-cta"
-              className="bg-background/90 backdrop-blur-sm"
+              className="bg-background text-foreground border-border"
             >
               Try as Guest
             </Button>

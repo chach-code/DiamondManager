@@ -81,6 +81,18 @@
 - Icon buttons: Circular (rounded-full), p-2
 - Destructive actions: Use icon with confirmation modal
 
+**CRITICAL: Button Contrast Requirements**
+- **ALL buttons MUST have sufficient color contrast between text and background**
+- Minimum contrast ratio: 4.5:1 for normal text, 3:1 for large text (WCAG AA)
+- Light backgrounds (white, light gray): Use dark text (foreground, dark gray, black)
+- Dark backgrounds (dark gray, black): Use light text (white, light gray)
+- Outline buttons: Must have explicit text color that contrasts with background
+- When using backdrop blur or semi-transparent backgrounds:
+  - Ensure text color provides sufficient contrast against the blurred/transparent background
+  - Test in both light and dark modes
+  - Never use white text on white backgrounds or dark text on dark backgrounds
+- Example: `bg-white text-foreground` or `bg-gray-900 text-white` (not `bg-white text-white`)
+
 ## Iconography
 
 **Icon Library**: Heroicons (solid and outline variants via CDN)
