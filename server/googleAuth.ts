@@ -328,18 +328,30 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   let authMethod = 'cookie';
 
   // Check session-based auth first (primary method)
-  if (req.isAuthenticated() && user) {
+  if (req.isAuthenticated && typeof req.isAuthenticated === 'function' && req.isAuthenticated() && user) {
     // Session cookie auth succeeded
     authMethod = 'cookie';
+    console.log("🍪 [isAuthenticated] Cookie auth successful for user:", user.claims?.sub);
   } else {
     // Fall back to JWT token auth (for Safari cookie issues)
     const authHeader = req.headers.authorization;
+    console.log("🔍 [isAuthenticated] Checking JWT token auth", {
+      hasAuthHeader: !!authHeader,
+      authHeaderPreview: authHeader ? authHeader.substring(0, 20) + '...' : null,
+      url: req.url,
+    });
+    
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       const jwtSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret';
       
       try {
         const decoded = jwt.verify(token, jwtSecret) as any;
+        console.log("✅ [isAuthenticated] JWT verification successful", {
+          userId: decoded?.userId,
+          email: decoded?.email,
+        });
+        
         if (decoded.userId) {
           // JWT is valid, fetch user from database
           const { storage } = await import("./storage");
@@ -353,19 +365,34 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
                 email: dbUser.email,
               },
             };
+            // Set req.user so routes can access it
+            req.user = user;
             authMethod = 'jwt';
-            console.log("🔑 [Auth] Authenticated via JWT token for user:", dbUser.id);
+            console.log("🔑 [isAuthenticated] Authenticated via JWT token for user:", dbUser.id);
+          } else {
+            console.error("❌ [isAuthenticated] User not found in database:", decoded.userId);
           }
         }
-      } catch (err) {
-        console.error("JWT verification failed:", err);
+      } catch (err: any) {
+        console.error("❌ [isAuthenticated] JWT verification failed:", {
+          error: err.message,
+          name: err.name,
+          tokenPreview: token.substring(0, 50) + '...',
+        });
       }
+    } else {
+      console.log("⚠️ [isAuthenticated] No Authorization header found");
     }
   }
 
   // If still not authenticated, return 401
   if (!user) {
-    console.error("Authentication failed: No valid session cookie or JWT token");
+    console.error("❌ [isAuthenticated] Authentication failed: No valid session cookie or JWT token", {
+      url: req.url,
+      method: req.method,
+      hasCookie: !!req.isAuthenticated && typeof req.isAuthenticated === 'function' && req.isAuthenticated(),
+      hasAuthHeader: !!req.headers.authorization,
+    });
     return res.status(401).json({ message: "Unauthorized" });
   }
 

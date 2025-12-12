@@ -64,20 +64,25 @@ export const getQueryFn: <T>(options: {
     const path = queryKey.join("/") as string;
     const apiUrl = getApiUrl(path);
     
-    // Build headers - only include if needed
-    let headers: Record<string, string> | undefined = undefined;
+    // Build headers - always create object for consistency
+    const headers: Record<string, string> = {};
     
     // Add JWT token if using token-based auth (Safari fallback)
-    if (shouldUseTokenAuth()) {
-      const token = getAuthToken();
-      if (token) {
-        headers = { "Authorization": `Bearer ${token}` };
+    // Wrap in try-catch to handle test environments where localStorage might not be available
+    try {
+      if (typeof window !== 'undefined' && shouldUseTokenAuth()) {
+        const token = getAuthToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
       }
+    } catch (e) {
+      // Ignore errors in test environment where localStorage might not be available
     }
     
     try {
       const res = await fetch(apiUrl, {
-        ...(headers && { headers }),
+        headers, // Always include headers object (even if empty) for consistency with tests
         credentials: "include", // Still include credentials for cookie auth (Chrome)
         cache: "no-cache",
       });

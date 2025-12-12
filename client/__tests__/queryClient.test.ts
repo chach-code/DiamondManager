@@ -36,7 +36,7 @@ describe('queryClient utilities', () => {
       expect(result).toEqual(mockData);
       expect(global.fetch).toHaveBeenCalledWith(
         'https://api.example.com/api/test',
-        { credentials: 'include', cache: 'no-cache' }
+        { headers: {}, credentials: 'include', cache: 'no-cache' }
       );
     });
 
