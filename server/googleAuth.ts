@@ -78,6 +78,15 @@ export function getSession() {
     !!process.env.DATABASE_URL &&
     process.env.DEV_USE_MEMORY_STORE !== "true";
 
+  // Determine if we're in a cross-origin setup (GitHub Pages to Render)
+  // When sameSite is 'none', secure MUST be true (browser requirement)
+  const isProduction = process.env.NODE_ENV === "production";
+  const isCrossOrigin = isProduction || process.env.APP_ORIGIN?.includes('github.io');
+  const sameSiteValue: 'none' | 'lax' = isCrossOrigin ? 'none' : 'lax';
+  // CRITICAL: When sameSite is 'none', secure MUST be true (browser requirement)
+  // Even in dev, if we're testing cross-origin, we need secure: true
+  const secureValue = sameSiteValue === 'none' ? true : isProduction;
+
   if (usePg) {
     const pgStore = connectPg(session);
     const store = new pgStore({
@@ -94,10 +103,10 @@ export function getSession() {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: secureValue, // Must be true when sameSite is 'none'
         maxAge: sessionTtl,
-        // For cross-origin (GitHub Pages to Render), need sameSite: 'none'
-        sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
+        sameSite: sameSiteValue,
+        // Don't set domain - let browser set it automatically for cross-origin cookies
       },
     });
   }
@@ -114,10 +123,10 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: secureValue, // Must be true when sameSite is 'none'
       maxAge: sessionTtl,
-      // For cross-origin (GitHub Pages to Render), need sameSite: 'none'
-      sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
+      sameSite: sameSiteValue,
+      // Don't set domain - let browser set it automatically for cross-origin cookies
     },
   });
 }
@@ -227,14 +236,24 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user?.expires_at) {
+  // Check if session is authenticated first
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Check if user object exists and has expiration
+  if (!user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const now = Math.floor(Date.now() / 1000);
 
-  if (now <= user.expires_at) return next();
+  // If token hasn't expired, proceed
+  if (now <= user.expires_at) {
+    return next();
+  }
 
+  // Token expired - try to refresh
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -253,7 +272,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     user.expires_at = refreshed.claims()?.exp;
 
     return next();
-  } catch {
+  } catch (error) {
+    // Log refresh error for debugging (but don't expose details to client)
+    console.error("Token refresh failed:", error);
     return res.status(401).json({ message: "Unauthorized" });
   }
 };
