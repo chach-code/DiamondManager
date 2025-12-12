@@ -1,0 +1,353 @@
+# Cursor AI Rules for DiamondManager Project
+
+## Testing Requirements & Best Practices
+
+### Mandatory Testing Principles
+
+1. **Test-Driven Development (TDD) Approach**
+   - When fixing bugs: ALWAYS write a test that reproduces/exposes the bug FIRST, then fix the bug
+   - When adding features: Write tests BEFORE or ALONGSIDE implementation
+   - Never commit code without corresponding tests
+   - All tests must pass before considering work complete
+
+2. **Test Coverage Requirements**
+   - **Unit Tests**: Write unit tests for ALL functions, utilities, and business logic
+   - **Integration Tests**: Add integration tests for API routes, database interactions, and service integrations
+   - **Component Tests**: Write component tests for ALL UI components using React Testing Library
+   - **E2E Tests**: Add E2E tests (Playwright) for user workflows and critical paths
+
+3. **Test Structure by Type**
+
+   **Unit Tests (Jest)**
+   - Location: `server/__tests__/` or `client/__tests__/`
+   - Test all functions, hooks, utilities in isolation
+   - Mock external dependencies (API calls, database, localStorage, etc.)
+   - Example: `useTeams.test.ts`, `queryClient.test.ts`, `authUtils.test.ts`
+
+   **Integration Tests (Jest)**
+   - Location: `server/__tests__/routes.*.test.ts`
+   - Test API endpoints with mocked storage layer
+   - Test authentication middleware
+   - Test database queries (use test database or mocks)
+
+   **Component Tests (React Testing Library)**
+   - Location: `client/src/components/__tests__/` or `client/src/__tests__/components/`
+   - Test component rendering, user interactions, props handling
+   - Test accessibility where applicable
+   - Mock hooks and API calls
+   - Example: `TeamSwitcher.test.tsx`, `PlayerCard.test.tsx`
+
+   **E2E Tests (Playwright)**
+   - Location: `e2e/*.spec.ts`
+   - Test complete user workflows
+   - Test cross-browser compatibility (Chrome, Safari)
+   - Test authentication flows
+   - Test critical business logic from user perspective
+
+4. **Bug Fix Workflow**
+   ```
+   1. Reproduce the bug manually or from user report
+   2. Write a test that FAILS and exposes the bug (red)
+   3. Fix the bug (green)
+   4. Verify all tests pass (including new test)
+   5. Refactor if needed while keeping tests green
+   ```
+
+5. **Feature Development Workflow**
+   ```
+   1. Write test(s) for the new feature (red)
+   2. Implement feature to make tests pass (green)
+   3. Add integration/E2E tests if needed
+   4. Refactor and improve while keeping tests green
+   ```
+
+### Testing Best Practices
+
+1. **Test Naming**
+   - Use descriptive test names: `describe('Component/Function Name', () => { ... })`
+   - Test names should explain what is being tested: `it('should return teams when user is authenticated', ...)`
+   - Group related tests with `describe` blocks
+
+2. **Test Isolation**
+   - Each test should be independent and not rely on other tests
+   - Use `beforeEach`/`afterEach` to set up/tear down test state
+   - Clear mocks between tests with `jest.clearAllMocks()`
+
+3. **Mocking Guidelines**
+   - Mock external dependencies (API, database, localStorage, window)
+   - Mock React hooks when testing components that use them
+   - Use `jest.mock()` for module-level mocks
+   - Prefer mocking at the boundary (API calls, not internal functions)
+
+4. **Assertions**
+   - Use specific assertions: prefer `expect(x).toBe(y)` over `expect(x).toBeTruthy()`
+   - Test both positive and negative cases
+   - Test edge cases: empty arrays, null values, error conditions
+   - Test error handling and error messages
+
+5. **Test Data**
+   - Use factories or builders for creating test data
+   - Use unique identifiers (timestamps, UUIDs) to avoid conflicts
+   - Clean up test data after tests when possible
+
+### Code Patterns to Test
+
+**Functions/Utilities**
+```typescript
+// Example: test all functions in authUtils.ts
+describe('authUtils', () => {
+  it('should identify unauthorized errors correctly', () => {
+    // Test implementation
+  });
+});
+```
+
+**React Hooks**
+```typescript
+// Example: test useTeams hook
+describe('useTeams', () => {
+  it('should not make API calls when user is not authenticated', () => {
+    // Test that query is disabled when isAuthenticated is false
+  });
+  
+  it('should fetch teams when authenticated', () => {
+    // Test successful fetch
+  });
+});
+```
+
+**React Components**
+```typescript
+// Example: test TeamSwitcher component
+describe('TeamSwitcher', () => {
+  it('should render team name', () => {
+    // Test rendering
+  });
+  
+  it('should call onTeamSelect when team is selected', () => {
+    // Test user interaction
+  });
+});
+```
+
+**API Routes**
+```typescript
+// Example: test teams API routes
+describe('GET /api/teams', () => {
+  it('should require authentication', () => {
+    // Test 401 when not authenticated
+  });
+  
+  it('should return teams for authenticated user', () => {
+    // Test successful response
+  });
+});
+```
+
+**E2E Workflows**
+```typescript
+// Example: test team creation workflow
+test('should create a new team and switch to it', async ({ page }) => {
+  // Test complete user workflow
+});
+```
+
+### Special Considerations
+
+1. **Authentication Tests**
+   - Test authenticated and unauthenticated states
+   - Test guest mode behavior
+   - Test authentication errors (401, 403)
+   - Test session persistence
+
+2. **Network/API Tests**
+   - Test successful responses
+   - Test error responses (4xx, 5xx)
+   - Test network failures
+   - Test retry logic (if applicable)
+   - Test loading states
+
+3. **Form Validation Tests**
+   - Test valid input
+   - Test invalid input
+   - Test required fields
+   - Test field-level validation
+   - Test submission errors
+
+4. **State Management Tests**
+   - Test state updates
+   - Test state persistence (localStorage)
+   - Test state cleanup
+   - Test state synchronization across components
+
+5. **Error Handling Tests**
+   - Test error boundaries
+   - Test error messages
+   - Test error recovery
+   - Test graceful degradation
+
+### Running Tests
+
+- **Jest Tests**: `npm test` or `npm test -- <pattern>`
+- **Component Tests**: Same as Jest (React Testing Library uses Jest)
+- **E2E Tests**: `npm run test:e2e`
+- **All Tests**: `npm test && npm run test:e2e`
+- **Watch Mode**: `npm test -- --watch` (Jest) or `npm run test:e2e:ui` (Playwright)
+
+### Test File Naming Conventions
+
+- Jest/Unit: `*.test.ts` or `*.test.tsx`
+- E2E: `*.spec.ts`
+- Match test file name to source file: `useTeams.ts` → `useTeams.test.ts`
+- Group related tests: `routes.teams.test.ts`, `routes.players.test.ts`
+
+### When Adding New Code
+
+**If you add a function:**
+1. Create a unit test file: `functionName.test.ts`
+2. Test all code paths (happy path, error cases, edge cases)
+3. Test with valid and invalid inputs
+
+**If you add a component:**
+1. Create a component test file: `ComponentName.test.tsx`
+2. Test rendering with different props
+3. Test user interactions (clicks, form submissions, etc.)
+4. Test accessibility if applicable
+
+**If you add an API route:**
+1. Add tests to existing route test file or create new one: `routes.feature.test.ts`
+2. Test authentication requirements
+3. Test success and error cases
+4. Test validation
+
+**If you add a feature:**
+1. Write unit tests for business logic
+2. Write component tests for UI
+3. Write E2E test for user workflow
+4. Ensure all tests pass
+
+### When Fixing Bugs
+
+1. **Reproduce the bug** - Understand what's broken
+2. **Write a failing test** - Test should fail with the current buggy code
+3. **Fix the bug** - Make the test pass
+4. **Verify all tests pass** - Ensure no regressions
+5. **Refactor if needed** - Improve code while keeping tests green
+
+### CI/CD Integration
+
+- All tests must pass in CI before merging
+- Type checking runs before tests: `npm run check`
+- Build verification runs after tests: `npm run build`
+- Pre-commit hooks run: `npm run verify` (type check + tests)
+
+### Documentation
+
+- Update `TESTING.md` when adding new test categories or patterns
+- Document any test setup requirements
+- Document any mocking strategies unique to the project
+- Keep test examples up to date
+
+### Code Review Checklist
+
+When reviewing code, ensure:
+- [ ] Tests are included for new/changed code
+- [ ] Tests cover happy path and error cases
+- [ ] Tests are well-named and readable
+- [ ] Mocks are used appropriately
+- [ ] Tests are independent and can run in any order
+- [ ] Bug fixes include a test that would have caught the bug
+- [ ] All tests pass locally
+- [ ] Test coverage is maintained or improved
+
+### Examples of Good Test Patterns
+
+**Testing a Bug Fix:**
+```typescript
+// Bug: useTeams makes repeated API calls when unauthenticated
+describe('useTeams authentication', () => {
+  it('should not make API requests when user is not authenticated', () => {
+    // This test would have caught the bug
+    const { result } = renderHook(() => useTeams(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider value={{ isAuthenticated: false, isLoading: false }}>
+            {children}
+          </AuthProvider>
+        </QueryClientProvider>
+      ),
+    });
+    
+    // Verify query is disabled
+    expect(result.current.isLoading).toBe(false);
+    // Verify no API calls were made (check mock)
+  });
+});
+```
+
+**Testing a Component:**
+```typescript
+describe('TeamSwitcher', () => {
+  it('should display current team name', () => {
+    const onTeamSelect = jest.fn();
+    render(
+      <TeamSwitcher 
+        selectedTeamId="team-1" 
+        onTeamSelect={onTeamSelect} 
+      />
+    );
+    
+    expect(screen.getByText('Team Name')).toBeInTheDocument();
+  });
+  
+  it('should call onTeamSelect when team is selected', async () => {
+    const onTeamSelect = jest.fn();
+    render(<TeamSwitcher selectedTeamId="team-1" onTeamSelect={onTeamSelect} />);
+    
+    await userEvent.click(screen.getByRole('button'));
+    await userEvent.click(screen.getByText('Team 2'));
+    
+    expect(onTeamSelect).toHaveBeenCalledWith('team-2');
+  });
+});
+```
+
+**Testing an API Route:**
+```typescript
+describe('GET /api/teams', () => {
+  it('should return 401 when not authenticated', async () => {
+    const response = await request(app)
+      .get('/api/teams')
+      .expect(401);
+  });
+  
+  it('should return teams for authenticated user', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
+    mockStorage.getUserTeams.mockResolvedValue([mockTeam]);
+    
+    const response = await request(app)
+      .get('/api/teams')
+      .expect(200);
+    
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0]).toMatchObject({ id: 'team-1', name: 'Test Team' });
+  });
+});
+```
+
+## Summary
+
+**Key Principles:**
+- ✅ Write tests for every function, component, and feature
+- ✅ Fix bugs test-first: write failing test, then fix bug
+- ✅ All tests must pass before committing
+- ✅ Use appropriate test type (unit/integration/component/E2E) for each case
+- ✅ Test both success and failure paths
+- ✅ Keep tests independent and maintainable
+
+**Never:**
+- ❌ Skip tests because "it's a small change"
+- ❌ Commit code without tests
+- ❌ Write tests that depend on other tests
+- ❌ Mock things that don't need mocking
+- ❌ Write tests that are hard to understand or maintain

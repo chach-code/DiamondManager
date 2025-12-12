@@ -1,17 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Team } from "@shared/schema";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 
 const LAST_TEAM_KEY = "lastSelectedTeamId";
 
 export function useTeams() {
   const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   // Fetch all teams for the current user
+  // Only enable the query when user is authenticated to prevent 401 loops
   const { data: teams = [], isLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
     queryFn: getQueryFn<Team[]>({ on401: "throw" }),
-    enabled: true,
+    enabled: isAuthenticated && !authLoading, // Only fetch when authenticated
+    retry: false, // Don't retry on errors (including 401)
   });
 
   // Get last selected team ID from localStorage

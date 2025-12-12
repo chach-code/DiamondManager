@@ -1,15 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Player, InsertPlayer } from "@shared/schema";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 
 export function useTeamPlayers(teamId: string | null) {
   const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   // Fetch players for a specific team
+  // Only enable when we have a teamId AND user is authenticated
   const { data: players = [], isLoading } = useQuery<Player[]>({
     queryKey: ["/api/teams", teamId, "players"],
     queryFn: getQueryFn<Player[]>({ on401: "throw" }),
-    enabled: !!teamId,
+    enabled: !!teamId && isAuthenticated && !authLoading,
+    retry: false, // Don't retry on errors (including 401)
   });
 
   // Create player mutation
