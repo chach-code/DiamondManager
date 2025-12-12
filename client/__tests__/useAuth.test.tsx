@@ -9,13 +9,15 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, createElement } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { getQueryFn } from '@/lib/queryClient';
+import { getApiUrl } from '@/lib/apiConfig';
 
-// Mock queryClient module
-jest.mock('@/lib/queryClient', () => ({
-  getQueryFn: jest.fn(),
-  queryClient: new QueryClient(),
+// Mock apiConfig module
+jest.mock('@/lib/apiConfig', () => ({
+  getApiUrl: jest.fn((path: string) => `https://api.example.com${path}`),
 }));
+
+// Mock global fetch
+global.fetch = jest.fn();
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -89,8 +91,14 @@ describe('useAuth', () => {
 
   describe('authentication state', () => {
     it('should return null user when not authenticated', async () => {
-      const mockQueryFn = jest.fn().mockResolvedValue(null);
-      (getQueryFn as jest.Mock).mockReturnValue(mockQueryFn);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+        text: async () => 'Unauthorized',
+        json: async () => null,
+        headers: new Headers(),
+        url: 'https://api.example.com/api/auth/user',
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -113,8 +121,13 @@ describe('useAuth', () => {
         updatedAt: new Date(),
       };
 
-      const mockQueryFn = jest.fn().mockResolvedValue(mockUser);
-      (getQueryFn as jest.Mock).mockReturnValue(mockQueryFn);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => mockUser,
+        headers: new Headers(),
+        url: 'https://api.example.com/api/auth/user',
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -139,8 +152,13 @@ describe('useAuth', () => {
         updatedAt: new Date(),
       };
 
-      const mockQueryFn = jest.fn().mockResolvedValue(mockUser);
-      (getQueryFn as jest.Mock).mockReturnValue(mockQueryFn);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => mockUser,
+        headers: new Headers(),
+        url: 'https://api.example.com/api/auth/user',
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -170,8 +188,13 @@ describe('useAuth', () => {
         updatedAt: new Date(),
       };
 
-      const mockQueryFn = jest.fn().mockResolvedValue(mockUser);
-      (getQueryFn as jest.Mock).mockReturnValue(mockQueryFn);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => mockUser,
+        headers: new Headers(),
+        url: 'https://api.example.com/api/auth/user',
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -248,16 +271,21 @@ describe('useAuth', () => {
 
   describe('loading state', () => {
     it('should return isLoading true initially', () => {
-      const mockQueryFn = jest.fn(() => new Promise(() => {})); // Never resolves
-      (getQueryFn as jest.Mock).mockReturnValue(mockQueryFn);
+      (global.fetch as jest.Mock).mockImplementation(() => new Promise(() => {})); // Never resolves
 
       const { result } = renderHook(() => useAuth(), { wrapper });
       expect(result.current.isLoading).toBe(true);
     });
 
     it('should return isLoading false after query completes', async () => {
-      const mockQueryFn = jest.fn().mockResolvedValue(null);
-      (getQueryFn as jest.Mock).mockReturnValue(mockQueryFn);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+        text: async () => 'Unauthorized',
+        json: async () => null,
+        headers: new Headers(),
+        url: 'https://api.example.com/api/auth/user',
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
