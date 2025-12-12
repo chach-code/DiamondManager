@@ -9,11 +9,17 @@ export function useTeamPlayers(teamId: string | null) {
 
   // Fetch players for a specific team
   // Only enable when we have a teamId AND user is authenticated
+  // Use explicit boolean checks to ensure we never enable when not authenticated
+  const shouldFetchPlayers = Boolean(teamId && isAuthenticated && !authLoading);
+  
   const { data: players = [], isLoading } = useQuery<Player[]>({
     queryKey: ["/api/teams", teamId, "players"],
     queryFn: getQueryFn<Player[]>({ on401: "throw" }),
-    enabled: !!teamId && isAuthenticated && !authLoading,
+    enabled: shouldFetchPlayers,
     retry: false, // Don't retry on errors (including 401)
+    refetchOnMount: false, // Don't refetch on mount if query is disabled
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on reconnect
   });
 
   // Create player mutation

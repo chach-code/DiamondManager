@@ -1,3 +1,14 @@
+/**
+ * E2E Tests for Authentication Loop Prevention
+ * 
+ * This test suite was created to prevent regression of the bug where useTeams
+ * was making repeated API calls to /api/teams when unauthenticated, causing
+ * a 401 loop.
+ * 
+ * Per .cursorrules: Bug fixes should include a test that exposes the bug.
+ * This test would have caught the original bug and ensures it doesn't recur.
+ */
+
 import { test, expect } from '@playwright/test';
 
 // Allow testing against localhost or production
@@ -37,12 +48,14 @@ test.describe('Authentication Loop Prevention', () => {
       !req.url.includes('/api/teams/') // Only base /api/teams, not team-specific endpoints
     );
     
-    // The bug was that useTeams would make repeated requests even when unauthenticated
-    // With the fix, useTeams should NOT make any requests when isAuthenticated is false
-    // So we expect 0 requests to /api/teams when unauthenticated
+    // THE BUG: useTeams was making repeated requests even when unauthenticated
+    // The fix: useTeams now checks isAuthenticated before enabling the query
     // 
-    // However, we might get 1 request if the query initially tries before auth check completes
-    // So we allow 0-1 requests, but definitely not multiple (which would indicate a loop)
+    // This test would have FAILED before the fix (multiple requests detected)
+    // This test PASSES after the fix (0-1 requests max, ideally 0)
+    // 
+    // We allow 0-1 requests to account for edge case timing, but definitely 
+    // not multiple requests (which would indicate the loop bug is back)
     expect(teamsRequests.length).toBeLessThanOrEqual(1);
     
     // If there were any requests, they should be 401 (Unauthorized)

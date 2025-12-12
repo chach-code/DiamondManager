@@ -11,11 +11,17 @@ export function useTeams() {
 
   // Fetch all teams for the current user
   // Only enable the query when user is authenticated to prevent 401 loops
+  // Use explicit boolean checks to ensure we never enable when not authenticated
+  const shouldFetchTeams = Boolean(isAuthenticated && !authLoading);
+  
   const { data: teams = [], isLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
     queryFn: getQueryFn<Team[]>({ on401: "throw" }),
-    enabled: isAuthenticated && !authLoading, // Only fetch when authenticated
+    enabled: shouldFetchTeams, // Only fetch when authenticated
     retry: false, // Don't retry on errors (including 401)
+    refetchOnMount: false, // Don't refetch on mount if query is disabled
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on reconnect
   });
 
   // Get last selected team ID from localStorage
