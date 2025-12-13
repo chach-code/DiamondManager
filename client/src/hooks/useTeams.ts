@@ -32,7 +32,12 @@ export function useTeams() {
     // This handles Safari's localStorage timing issues
     if (isSafari && isAuthenticated && !authLoading && user && !delayTriggeredRef.current) {
       delayTriggeredRef.current = true;
-      console.log("🍎 [useTeams] Safari detected with authenticated user, adding delay before enabling teams query");
+      console.log("🍎 [useTeams] Safari detected with authenticated user, adding delay before enabling teams query", {
+        userId: user.id,
+        email: user.email,
+        isAuthenticated,
+        authLoading,
+      });
       
       // Clear any existing timer
       if (delayTimerRef.current) {
@@ -48,13 +53,25 @@ export function useTeams() {
           console.log("✅ [useTeams] Token verified accessible, enabling teams query", {
             tokenLength: token.length,
             tokenPreview: token.substring(0, 30) + '...',
+            tokenParts: token.split('.').length, // Should be 3 for JWT
           });
           setSafariDelayComplete(true);
         } else {
-          console.warn("⚠️ [useTeams] Token not found after delay, but enabling query anyway");
+          console.error("❌ [useTeams] Token not found after delay - this should not happen!", {
+            localStorageAvailable: typeof localStorage !== 'undefined',
+            shouldUseTokenAuth: typeof window !== 'undefined' ? (() => {
+              try {
+                const { shouldUseTokenAuth } = require('@/lib/authToken');
+                return shouldUseTokenAuth();
+              } catch {
+                return 'error checking';
+              }
+            })() : 'N/A',
+          });
+          // Still enable to avoid blocking forever, but log error
           setSafariDelayComplete(true);
         }
-      }, 1000); // 1 second delay for Safari (increased from 500ms for better reliability)
+      }, 500); // Reduced to 500ms - if token isn't accessible by then, something else is wrong
     } else if (!isSafari) {
       // Not Safari - enable immediately
       if (!safariDelayComplete) {
@@ -101,40 +118,52 @@ export function useTeams() {
   
   const { data: teams = [], isLoading, error, fetchStatus } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
+    enabled: shouldFetchTeams, // CRITICAL: Only fetch when authenticated AND delay complete
+    retry: false, // NO RETRIES - if it fails, it fails. No loops.
+    retryOnMount: false,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    gcTime: 0,
+    staleTime: Infinity,
     queryFn: async (context) => {
+      const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
       console.log("🚀 [useTeams] Query function executing", {
         queryKey: context.queryKey,
         shouldFetchTeams,
+        isSafari,
+        safariDelayComplete,
+        isAuthenticated,
+        hasUser: !!user,
       });
       
       // CRITICAL: Safari fix - verify token is accessible before making request
-      // Safari sometimes has timing issues where localStorage reads fail immediately after write
-      let token = getAuthToken();
+      // Log token details for debugging
+      const token = getAuthToken();
+      
       if (!token) {
-        console.warn("⚠️ [useTeams] Token not found in localStorage, waiting and retrying (Safari timing issue)");
-        // Wait a bit and try again (Safari timing issue)
-        // Try multiple times with increasing delays
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, 200 * attempt)); // 200ms, 400ms, 600ms
-          token = getAuthToken();
-          if (token) {
-            console.log(`✅ [useTeams] Token found after ${attempt} retry attempt(s)`, {
-              tokenLength: token.length,
-              tokenPreview: token.substring(0, 30) + '...',
-            });
-            break;
-          }
-        }
-        if (!token) {
-          console.error("❌ [useTeams] Token not found after multiple retries - cannot make request");
-          throw new Error("401: Unauthorized - authentication token not available");
-        }
-      } else {
-        console.log("✅ [useTeams] Token verified accessible before request", {
-          tokenLength: token.length,
-          tokenPreview: token.substring(0, 30) + '...',
+        console.error("❌ [useTeams] Token not found in localStorage - cannot make request", {
+          isSafari,
+          localStorageAvailable: typeof localStorage !== 'undefined',
+          shouldUseTokenAuth: typeof window !== 'undefined' ? (() => {
+            try {
+              const { shouldUseTokenAuth } = require('@/lib/authToken');
+              return shouldUseTokenAuth();
+            } catch {
+              return 'error checking';
+            }
+          })() : 'N/A',
         });
+        throw new Error("401: Unauthorized - authentication token not available");
       }
+      
+      console.log("✅ [useTeams] Token verified accessible before request", {
+        tokenLength: token.length,
+        tokenPreview: token.substring(0, 30) + '...',
+        tokenParts: token.split('.').length, // Should be 3 for JWT
+        isSafari,
+        willBeIncludedInHeader: true,
+      });
       
       const result = await getQueryFn<Team[]>({ on401: "throw" })(context);
       console.log("✅ [useTeams] Query function completed", {
@@ -143,14 +172,6 @@ export function useTeams() {
       });
       return result;
     },
-    enabled: shouldFetchTeams, // CRITICAL: Only fetch when authenticated
-    retry: false, // Don't retry on errors (including 401)
-    retryOnMount: false, // Don't retry on mount even if there's an error
-    refetchOnMount: false, // Don't refetch on mount if query is disabled
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnReconnect: false, // Don't refetch on reconnect
-    gcTime: 0, // Don't cache the query data when disabled (prevents stale data)
-    staleTime: Infinity, // Never consider data stale (prevents automatic refetches)
   });
   
   // Log query status changes
@@ -164,15 +185,24 @@ export function useTeams() {
     });
   }, [shouldFetchTeams, isLoading, fetchStatus, error, teams.length]);
   
-  // Log query state changes
+  // Log query state changes - only log once per error to avoid spam
+  const lastErrorRef = useRef<Error | null>(null);
   useEffect(() => {
-    if (error) {
-      console.error("❌ [useTeams] Query error:", error);
+    if (error && error !== lastErrorRef.current) {
+      lastErrorRef.current = error as Error;
+      console.error("❌ [useTeams] Query error:", {
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : 'Unknown',
+        shouldFetchTeams,
+        isAuthenticated,
+        hasUser: !!user,
+        safariDelayComplete,
+      });
     }
     if (teams.length > 0) {
       console.log("✅ [useTeams] Teams loaded:", teams.length);
     }
-  }, [error, teams]);
+  }, [error, teams, shouldFetchTeams, isAuthenticated, user, safariDelayComplete]);
 
   // CRITICAL: Cancel queries if user becomes unauthenticated
   // Only cancel - don't remove/reset as that might trigger React Query to re-initialize

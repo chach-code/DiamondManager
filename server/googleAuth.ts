@@ -335,10 +335,27 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   } else {
     // Fall back to JWT token auth (for Safari cookie issues)
     const authHeader = req.headers.authorization;
+    const isSafari = req.get('user-agent')?.includes('Safari') && !req.get('user-agent')?.includes('Chrome');
+    
+    // CRITICAL: Log all headers for Safari debugging
+    const allHeaders: Record<string, string | undefined> = {};
+    Object.keys(req.headers).forEach(key => {
+      allHeaders[key] = req.headers[key] as string | undefined;
+    });
+    
     console.log("🔍 [isAuthenticated] Checking JWT token auth", {
       hasAuthHeader: !!authHeader,
-      authHeaderPreview: authHeader ? authHeader.substring(0, 20) + '...' : null,
+      authHeaderValue: authHeader || 'NOT PRESENT',
+      authHeaderPreview: authHeader ? authHeader.substring(0, 50) + '...' : null,
+      authHeaderLength: authHeader?.length || 0,
+      authHeaderStartsWithBearer: authHeader?.startsWith('Bearer ') || false,
       url: req.url,
+      method: req.method,
+      isSafari,
+      userAgent: req.get('user-agent')?.substring(0, 100),
+      origin: req.get('origin'),
+      referer: req.get('referer'),
+      allHeaders, // Log all headers to see what Safari is sending
     });
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -377,11 +394,21 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
         console.error("❌ [isAuthenticated] JWT verification failed:", {
           error: err.message,
           name: err.name,
+          tokenLength: token.length,
           tokenPreview: token.substring(0, 50) + '...',
+          tokenParts: token.split('.').length, // Should be 3 for JWT
+          isSafari,
+          url: req.url,
         });
       }
     } else {
-      console.log("⚠️ [isAuthenticated] No Authorization header found");
+      console.log("⚠️ [isAuthenticated] No Authorization header found", {
+        hasAuthHeader: !!authHeader,
+        authHeaderValue: authHeader || 'NOT PRESENT',
+        isSafari,
+        url: req.url,
+        allHeaders: Object.keys(req.headers),
+      });
     }
   }
 

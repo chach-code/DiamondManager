@@ -133,10 +133,23 @@ export const getQueryFn: <T>(options: {
     }
     
     try {
+      // CRITICAL: Log full request details for Safari debugging
+      const authHeaderValue = headers["Authorization"];
+      const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      
       console.log("📡 [queryClient] Making request", {
         url: apiUrl,
-        hasAuthHeader: !!headers["Authorization"],
-        headers: Object.keys(headers),
+        method: 'GET',
+        hasAuthHeader: !!authHeaderValue,
+        authHeaderExists: authHeaderValue !== undefined,
+        authHeaderLength: authHeaderValue?.length || 0,
+        authHeaderPreview: authHeaderValue ? authHeaderValue.substring(0, 50) + '...' : 'none',
+        authHeaderFull: authHeaderValue || 'NOT SET', // Log full header for debugging
+        allHeaders: Object.keys(headers),
+        headersObject: headers, // Log entire headers object
+        isSafari,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) : 'N/A',
+        credentials: 'include',
       });
       
       const res = await fetch(apiUrl, {
@@ -145,11 +158,45 @@ export const getQueryFn: <T>(options: {
         cache: "no-cache",
       });
       
+      // CRITICAL: Log response details including headers for Safari debugging
+      const responseHeaders: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      
       console.log("📡 [queryClient] Response received", {
         url: apiUrl,
         status: res.status,
         statusText: res.statusText,
+        ok: res.ok,
+        redirected: res.redirected,
+        type: res.type,
+        responseHeaders,
+        isSafari,
       });
+      
+      // If 401, log additional debugging info BEFORE reading body
+      if (res.status === 401) {
+        // Clone response to read body without consuming original
+        const clonedRes = res.clone();
+        let responseBody = 'Could not read response body';
+        try {
+          responseBody = await clonedRes.text();
+        } catch (e) {
+          // Ignore errors reading body
+        }
+        
+        console.error("❌ [queryClient] 401 Unauthorized - Debugging info", {
+          url: apiUrl,
+          requestHadAuthHeader: !!authHeaderValue,
+          authHeaderValue: authHeaderValue || 'MISSING',
+          authHeaderFull: authHeaderValue || 'NOT SET',
+          isSafari,
+          responseHeaders,
+          responseBody,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+        });
+      }
 
       // CRITICAL: Handle 401 immediately to prevent retry loops
       if (res.status === 401) {
