@@ -1,23 +1,86 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Team } from "@shared/schema";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { getAuthToken } from "@/lib/authToken";
 
 const LAST_TEAM_KEY = "lastSelectedTeamId";
 
 export function useTeams() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  
+  // CRITICAL: Safari fix - track OAuth redirect and add delay before enabling teams query
+  // Safari needs time for localStorage token to be fully accessible after OAuth redirect
+  const [safariDelayComplete, setSafariDelayComplete] = useState(false);
+  const delayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const oauthRedirectDetectedRef = useRef(false);
+
+  // Detect OAuth redirect in Safari
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setSafariDelayComplete(true); // Enable immediately if no window
+      return;
+    }
+    
+    const pathname = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthCallback = urlParams.get('oauth_callback') === '1';
+    const oauthRedirectFlag = sessionStorage.getItem('oauth_redirect');
+    const isAppPath = pathname.includes('/app');
+    const isOAuthRedirect = (oauthCallback || oauthRedirectFlag) && isAppPath;
+    
+    // Detect Safari
+    const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if (isOAuthRedirect && isSafari && !oauthRedirectDetectedRef.current) {
+      oauthRedirectDetectedRef.current = true;
+      console.log("🍎 [useTeams] Safari OAuth redirect detected, adding delay before enabling teams query");
+      
+      // Clear any existing timer
+      if (delayTimerRef.current) {
+        clearTimeout(delayTimerRef.current);
+      }
+      
+      // Add delay to ensure token is accessible in Safari
+      // Safari sometimes needs a moment for localStorage writes to be fully committed
+      delayTimerRef.current = setTimeout(() => {
+        // Verify token is accessible before enabling query
+        const token = getAuthToken();
+        if (token) {
+          console.log("✅ [useTeams] Token verified accessible, enabling teams query");
+          setSafariDelayComplete(true);
+        } else {
+          console.warn("⚠️ [useTeams] Token not found after delay, but enabling query anyway");
+          setSafariDelayComplete(true);
+        }
+      }, 500); // 500ms delay for Safari
+    } else {
+      // Not Safari OAuth redirect - enable immediately
+      if (!safariDelayComplete) {
+        setSafariDelayComplete(true);
+      }
+    }
+    
+    return () => {
+      if (delayTimerRef.current) {
+        clearTimeout(delayTimerRef.current);
+        delayTimerRef.current = null;
+      }
+    };
+  }, []); // Run once on mount
 
   // CRITICAL: Only enable the query when user is DEFINITELY authenticated
+  // AND Safari delay is complete (if applicable)
   // Check both isAuthenticated AND user object to be extra safe
   // This prevents ANY possibility of the query running when not authenticated
   const shouldFetchTeams = Boolean(
     !authLoading && // Auth check must be complete
     isAuthenticated && // Must be authenticated
     user !== null && // User object must exist
-    user !== undefined // User object must be defined
+    user !== undefined && // User object must be defined
+    safariDelayComplete // Safari delay must be complete (if OAuth redirect)
   );
   
   // Log when shouldFetchTeams changes
@@ -38,6 +101,21 @@ export function useTeams() {
         queryKey: context.queryKey,
         shouldFetchTeams,
       });
+      
+      // CRITICAL: Safari fix - verify token is accessible before making request
+      // Safari sometimes has timing issues where localStorage reads fail immediately after write
+      const token = getAuthToken();
+      if (!token) {
+        console.warn("⚠️ [useTeams] Token not found in localStorage, waiting 100ms and retrying");
+        // Wait a bit and try again (Safari timing issue)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const retryToken = getAuthToken();
+        if (!retryToken) {
+          throw new Error("401: Unauthorized - authentication token not available");
+        }
+        console.log("✅ [useTeams] Token found after retry");
+      }
+      
       const result = await getQueryFn<Team[]>({ on401: "throw" })(context);
       console.log("✅ [useTeams] Query function completed", {
         resultLength: Array.isArray(result) ? result.length : 'not array',
