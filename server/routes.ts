@@ -259,6 +259,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user || null;
       const isAuthenticated = req.isAuthenticated ? req.isAuthenticated() : false;
       
+      // Check for JWT token in Authorization header
+      const authHeader = req.headers.authorization;
+      let jwtInfo = null;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const decoded = jwt.verify(token, process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-secret') as any;
+          jwtInfo = {
+            present: true,
+            valid: true,
+            userId: decoded?.userId,
+            email: decoded?.email,
+            exp: decoded?.exp,
+            expired: decoded?.exp ? Date.now() / 1000 > decoded.exp : false,
+          };
+        } catch (err: any) {
+          jwtInfo = {
+            present: true,
+            valid: false,
+            error: err.message,
+          };
+        }
+      } else {
+        jwtInfo = { present: false };
+      }
+      
       // Enhanced debugging info for mobile Safari
       const debugInfo = { 
         isAuthenticated,
@@ -272,6 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           httpOnly: req.session.cookie.httpOnly,
           maxAge: req.session.cookie.maxAge,
         } : null,
+        jwtToken: jwtInfo,
         user: user ? {
           hasClaims: !!user.claims,
           hasExpiresAt: !!user.expires_at,
@@ -286,6 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           origin: req.get('origin'),
           referer: req.get('referer'),
           userAgent: req.get('user-agent')?.substring(0, 100),
+          authorization: authHeader ? authHeader.substring(0, 30) + '...' : 'none',
         },
         timestamp: new Date().toISOString(),
       };
