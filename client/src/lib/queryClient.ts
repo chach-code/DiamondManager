@@ -29,19 +29,44 @@ export async function apiRequest(
       const token = getAuthToken();
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
+        console.log("🔑 [apiRequest] Including JWT token in request", {
+          method,
+          url: apiUrl,
+          tokenLength: token.length,
+          tokenPreview: token.substring(0, 30) + '...',
+        });
+      } else {
+        console.warn("⚠️ [apiRequest] shouldUseTokenAuth() is true but no token found", { method, url: apiUrl });
       }
+    } else {
+      console.log("🍪 [apiRequest] Using cookie-based auth (not using JWT token)", { method, url: apiUrl });
     }
   } catch (e) {
     // Ignore errors in test environment where localStorage might not be available
+    console.warn("⚠️ [apiRequest] Error checking token auth:", e);
   }
   
   try {
+    console.log("📡 [apiRequest] Making request", {
+      method,
+      url: apiUrl,
+      hasAuthHeader: !!headers["Authorization"],
+      headers: Object.keys(headers),
+    });
+    
     const res = await fetch(apiUrl, {
       method,
       headers, // Always include headers object (even if empty) for consistency with tests
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include", // Still include credentials for cookie auth (Chrome)
       cache: "no-cache",
+    });
+    
+    console.log("📡 [apiRequest] Response received", {
+      method,
+      url: apiUrl,
+      status: res.status,
+      statusText: res.statusText,
     });
 
     await throwIfResNotOk(res);
@@ -74,17 +99,39 @@ export const getQueryFn: <T>(options: {
         const token = getAuthToken();
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
+          console.log("🔑 [queryClient] Including JWT token in request", {
+            url: apiUrl,
+            tokenLength: token.length,
+            tokenPreview: token.substring(0, 30) + '...',
+          });
+        } else {
+          console.warn("⚠️ [queryClient] shouldUseTokenAuth() is true but no token found", { url: apiUrl });
         }
+      } else {
+        console.log("🍪 [queryClient] Using cookie-based auth (not using JWT token)", { url: apiUrl });
       }
     } catch (e) {
       // Ignore errors in test environment where localStorage might not be available
+      console.warn("⚠️ [queryClient] Error checking token auth:", e);
     }
     
     try {
+      console.log("📡 [queryClient] Making request", {
+        url: apiUrl,
+        hasAuthHeader: !!headers["Authorization"],
+        headers: Object.keys(headers),
+      });
+      
       const res = await fetch(apiUrl, {
         headers, // Always include headers object (even if empty) for consistency with tests
         credentials: "include", // Still include credentials for cookie auth (Chrome)
         cache: "no-cache",
+      });
+      
+      console.log("📡 [queryClient] Response received", {
+        url: apiUrl,
+        status: res.status,
+        statusText: res.statusText,
       });
 
       // CRITICAL: Handle 401 immediately to prevent retry loops

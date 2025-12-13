@@ -20,6 +20,17 @@ export function useTeams() {
     user !== undefined // User object must be defined
   );
   
+  // Log when shouldFetchTeams changes
+  useEffect(() => {
+    console.log("🔍 [useTeams] shouldFetchTeams changed", {
+      shouldFetchTeams,
+      authLoading,
+      isAuthenticated,
+      hasUser: !!user,
+      userId: user?.id,
+    });
+  }, [shouldFetchTeams, authLoading, isAuthenticated, user]);
+  
   const { data: teams = [], isLoading, error } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
     queryFn: getQueryFn<Team[]>({ on401: "throw" }),
@@ -32,6 +43,16 @@ export function useTeams() {
     gcTime: 0, // Don't cache the query data when disabled (prevents stale data)
     staleTime: Infinity, // Never consider data stale (prevents automatic refetches)
   });
+  
+  // Log query state changes
+  useEffect(() => {
+    if (error) {
+      console.error("❌ [useTeams] Query error:", error);
+    }
+    if (teams.length > 0) {
+      console.log("✅ [useTeams] Teams loaded:", teams.length);
+    }
+  }, [error, teams]);
 
   // CRITICAL: Cancel queries if user becomes unauthenticated
   // Only cancel - don't remove/reset as that might trigger React Query to re-initialize
