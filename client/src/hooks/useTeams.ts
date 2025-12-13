@@ -31,9 +31,20 @@ export function useTeams() {
     });
   }, [shouldFetchTeams, authLoading, isAuthenticated, user]);
   
-  const { data: teams = [], isLoading, error } = useQuery<Team[]>({
+  const { data: teams = [], isLoading, error, fetchStatus } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
-    queryFn: getQueryFn<Team[]>({ on401: "throw" }),
+    queryFn: async (context) => {
+      console.log("🚀 [useTeams] Query function executing", {
+        queryKey: context.queryKey,
+        shouldFetchTeams,
+      });
+      const result = await getQueryFn<Team[]>({ on401: "throw" })(context);
+      console.log("✅ [useTeams] Query function completed", {
+        resultLength: Array.isArray(result) ? result.length : 'not array',
+        result,
+      });
+      return result;
+    },
     enabled: shouldFetchTeams, // CRITICAL: Only fetch when authenticated
     retry: false, // Don't retry on errors (including 401)
     retryOnMount: false, // Don't retry on mount even if there's an error
@@ -43,6 +54,17 @@ export function useTeams() {
     gcTime: 0, // Don't cache the query data when disabled (prevents stale data)
     staleTime: Infinity, // Never consider data stale (prevents automatic refetches)
   });
+  
+  // Log query status changes
+  useEffect(() => {
+    console.log("🔍 [useTeams] Query status changed", {
+      enabled: shouldFetchTeams,
+      isLoading,
+      fetchStatus,
+      hasError: !!error,
+      teamsCount: teams.length,
+    });
+  }, [shouldFetchTeams, isLoading, fetchStatus, error, teams.length]);
   
   // Log query state changes
   useEffect(() => {

@@ -381,10 +381,24 @@ export function useAuth() {
   // If user is authenticated, override guest mode
   const finalIsGuestMode = user ? false : isGuestMode;
 
+  const isAuthenticated = !!user;
+  
+  // Log authentication state changes
+  useEffect(() => {
+    console.log("🔍 [useAuth] Authentication state changed", {
+      hasUser: !!user,
+      userId: user?.id,
+      email: user?.email,
+      isLoading,
+      isAuthenticated,
+      isGuestMode: finalIsGuestMode,
+    });
+  }, [user, isLoading, isAuthenticated, finalIsGuestMode]);
+
   return {
     user: user || null,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated,
     isGuestMode: finalIsGuestMode,
     setIsGuestMode,
   };
