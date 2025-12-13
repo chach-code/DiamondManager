@@ -22,10 +22,12 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
   
-  // Add JWT token if using token-based auth (Safari fallback)
+  // Add JWT token if available (Safari fallback or when token exists)
+  // Always check for token first - if it exists, use it regardless of browser
   // Wrap in try-catch to handle test environments where localStorage might not be available
   try {
-    if (typeof window !== 'undefined' && shouldUseTokenAuth()) {
+    if (typeof window !== 'undefined') {
+      // First, check if token exists (most reliable)
       const token = getAuthToken();
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -34,12 +36,19 @@ export async function apiRequest(
           url: apiUrl,
           tokenLength: token.length,
           tokenPreview: token.substring(0, 30) + '...',
+          reason: 'token exists',
+        });
+      } else if (shouldUseTokenAuth()) {
+        // If no token but shouldUseTokenAuth says we should use tokens,
+        // log a warning (this shouldn't happen if token was stored correctly)
+        console.warn("⚠️ [apiRequest] shouldUseTokenAuth() is true but no token found", {
+          method,
+          url: apiUrl,
+          shouldUseTokenAuth: shouldUseTokenAuth(),
         });
       } else {
-        console.warn("⚠️ [apiRequest] shouldUseTokenAuth() is true but no token found", { method, url: apiUrl });
+        console.log("🍪 [apiRequest] Using cookie-based auth (no JWT token available)", { method, url: apiUrl });
       }
-    } else {
-      console.log("🍪 [apiRequest] Using cookie-based auth (not using JWT token)", { method, url: apiUrl });
     }
   } catch (e) {
     // Ignore errors in test environment where localStorage might not be available
@@ -92,10 +101,12 @@ export const getQueryFn: <T>(options: {
     // Build headers - always create object for consistency
     const headers: Record<string, string> = {};
     
-    // Add JWT token if using token-based auth (Safari fallback)
+    // Add JWT token if available (Safari fallback or when token exists)
+    // Always check for token first - if it exists, use it regardless of browser
     // Wrap in try-catch to handle test environments where localStorage might not be available
     try {
-      if (typeof window !== 'undefined' && shouldUseTokenAuth()) {
+      if (typeof window !== 'undefined') {
+        // First, check if token exists (most reliable)
         const token = getAuthToken();
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
@@ -103,12 +114,18 @@ export const getQueryFn: <T>(options: {
             url: apiUrl,
             tokenLength: token.length,
             tokenPreview: token.substring(0, 30) + '...',
+            reason: 'token exists',
+          });
+        } else if (shouldUseTokenAuth()) {
+          // If no token but shouldUseTokenAuth says we should use tokens,
+          // log a warning (this shouldn't happen if token was stored correctly)
+          console.warn("⚠️ [queryClient] shouldUseTokenAuth() is true but no token found", {
+            url: apiUrl,
+            shouldUseTokenAuth: shouldUseTokenAuth(),
           });
         } else {
-          console.warn("⚠️ [queryClient] shouldUseTokenAuth() is true but no token found", { url: apiUrl });
+          console.log("🍪 [queryClient] Using cookie-based auth (no JWT token available)", { url: apiUrl });
         }
-      } else {
-        console.log("🍪 [queryClient] Using cookie-based auth (not using JWT token)", { url: apiUrl });
       }
     } catch (e) {
       // Ignore errors in test environment where localStorage might not be available
